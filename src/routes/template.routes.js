@@ -4,6 +4,7 @@ import {
   getTemplateById,
   createTemplate,
   fillTemplate,
+  getAllTemplates,
 } from "../controllers/template.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 
@@ -16,5 +17,7 @@ router.get("/get-template-id/:id",verifyJWT,  getTemplateById);
 router.post("/create", createTemplate);
 
 router.post("/fill/:id", verifyJWT, fillTemplate);
+
+router.get("/get-all", verifyJWT, getAllTemplates);
 
 export default router;
