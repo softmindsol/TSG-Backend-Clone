@@ -87,14 +87,14 @@ export const loginAgent = asyncHandler(async (req, res) => {
   }
 
   // check demo period or subscription
-  const now = new Date();
-  const demoEnd = agent.demoEndDate ? new Date(agent.demoEndDate) : null;
-  const demoActive = demoEnd && now <= demoEnd;
+  // const now = new Date();
+  // const demoEnd = agent.demoEndDate ? new Date(agent.demoEndDate) : null;
+  // const demoActive = demoEnd && now <= demoEnd;
 
-  if (!demoActive && agent.subscriptionStatus !== "active") {
-    const expiryMsg = demoEnd ? `Your demo expired on ${demoEnd.toISOString()}.` : "Your demo is not active.";
-    throw new ApiError(403, `${expiryMsg} Please subscribe to continue.`);
-  }
+  // if (!demoActive && agent.subscriptionStatus !== "active") {
+  //   const expiryMsg = demoEnd ? `Your demo expired on ${demoEnd.toISOString()}.` : "Your demo is not active.";
+  //   throw new ApiError(403, `${expiryMsg} Please subscribe to continue.`);
+  // }
 
   // ensure JWT secret exists
   if (!process.env.JWT_SECRET) {
