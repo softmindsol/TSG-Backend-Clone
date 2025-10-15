@@ -129,7 +129,7 @@ export const getAllClients = asyncHandler(async (req, res) => {
   const [clients, totalClients] = await Promise.all([
     Client.find(query)
       .select(" -metadata") // Exclude heavy fields for list view
-      .populate("assignedAgent", "name email")
+      .populate("assignedAgent", "firstName email")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })
