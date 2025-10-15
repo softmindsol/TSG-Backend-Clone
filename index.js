@@ -10,6 +10,7 @@ import dealRoutes from "./src/routes/deal.routes.js";
 import eventRoutes from './src/routes/event.routes.js'
 import amlRoutes from "./src/routes/aml.routes.js"
 import templateRoutes from './src/routes/template.routes.js'
+import reportRoutes from "./src/routes/report.routes.js"
 dotenv.config();
 
 // Initialize Express app
@@ -55,7 +56,9 @@ app.use("/api/aml", amlRoutes);
 
 app.use("/api/template", templateRoutes);
 
+// Report endpoint
 
+app.use("/api/reports", reportRoutes);
 
 
 // ✅ Global error handler (must be after all routes)
