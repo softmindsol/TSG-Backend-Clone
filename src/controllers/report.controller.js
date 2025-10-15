@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import ApiError from "../utils/ApiError.js";
 import Client from "../models/client.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { Report } from "../models/report.schema.js";
+import { Report } from "../models/report.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 // Helper function to generate reports
 export const generateReport = async (req, res) => {
@@ -71,8 +71,8 @@ const generateComplianceReport = (client) => {
     Client Overview
     • Client Type: ${client.clientType || "N/A"}
     • Purchase Method: ${client?.buyingPreference?.purchaseMethod || "N/A"}
-    • Reason for Purchase: ${client.reasonForPurchase || "N/A"}
-    • Budget Range: £${client.budgetMin}–£${client.budgetMax}
+    • Reason for Purchase: ${client?.buyingPreference?.reasonForMove || "N/A"}
+    • Budget Range: £${client.buyingPreference.budget.min}–£${client.buyingPreference.budget.max}
     • Preferred Area: ${client?.buyingPreference.preferredLocation || "N/A"}
     • Current Position: ${client.currentPosition || "N/A"}
   `;
