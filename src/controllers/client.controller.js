@@ -280,7 +280,7 @@ export const getClientById = asyncHandler(async (req, res) => {
     const client = await Client.findOne({
       _id: clientId,
       assignedAgent: req.user._id,
-    }).populate("assignedAgent", "name email"); // optional: include agent info
+    }).populate("assignedAgent", "firstName email"); // optional: include agent info
 
     if (!client) {
       throw new ApiError(404, "Client not found or not assigned to you");

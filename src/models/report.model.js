@@ -25,6 +25,10 @@ const reportSchema = new mongoose.Schema(
       type: String, // The actual content of the generated report
       required: true,
     },
+    additionalNotes: {
+      type: String, // Custom notes added by the agent
+      default: "",
+    },
   },
   { timestamps: true }
 );
