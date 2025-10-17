@@ -106,11 +106,11 @@ const OffersSchema = new Schema(
     },
     date: {
       type: Date,
-      required: true,
+      default: null,
     },
     amount: {
       type: Number,
-      required: true,
+      default: null,
     },
     conditions: {
       type: String,
@@ -240,8 +240,28 @@ const DealSchema = new Schema(
   {
     dealName: { type: String, required: true, trim: true },
     propertyAddress: { type: String, default: null },
-    dealType: { type: String, default: null },
-    stage: { type: String, default: null },
+    dealType: {
+      type: String,
+      enum: [
+        "Residential Sourcing",
+        "Residential Rental",
+        "Commercial Sourcing",
+        "Commercial Rental",
+      ],
+      required: true,  // Make sure dealType is always provided
+    },
+    stage: {
+      type: String,
+      enum: [
+        "Discovery",
+        "Viewings",
+        "Offer Mode",
+        "Offer Accepted",
+        "Exchange",
+        "Completion",
+      ],
+      required: true,  // Ensure the stage is always provided
+    },
 
     client: { type: Schema.Types.ObjectId, ref: "Client", required: true },
     assignedAgent: {

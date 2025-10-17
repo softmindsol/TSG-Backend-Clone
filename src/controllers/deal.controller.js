@@ -4,26 +4,66 @@ import Client from "../models/client.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 import { v2 as cloudinary } from "cloudinary";
+
+const getDealPercentage = (stage) => {
+  const stagePercentages = {
+    Discovery: 0,
+    Viewings: 16.67,
+    "Offer Mode": 33.33,
+    "Offer Accepted": 50,
+    Exchange: 83.33,
+    Completion: 100,
+  };
+
+  return stagePercentages[stage] || 0; // Default to 0% if stage is invalid
+};
+
 // =========================
 // Create a new deal
 // =========================
 export const createDeal = asyncHandler(async (req, res) => {
+  console.log("testing");
   const { clientId } = req.params;
   const { dealName, propertyAddress, dealType, stage } = req.body;
 
+  // Define valid stages
+  const validStages = [
+    "Discovery",
+    "Viewings",
+    "Offer Mode",
+    "Offer Accepted",
+    "Exchange",
+    "Completion",
+  ];
+
+  // Validate the required fields
   if (!dealName || !propertyAddress || !dealType || !stage) {
     throw new ApiError(400, "All fields are required");
   }
 
+  // Validate the stage
+  if (!validStages.includes(stage)) {
+    throw new ApiError(
+      400,
+      "Invalid deal stage. Valid stages are: Discovery, Viewings, Offer Mode, Offer Accepted, Exchange, Completion"
+    );
+  }
+
+  // Check if the client exists and is assigned to the agent
   const client = await Client.findOne({
     _id: clientId,
     assignedAgent: req.user._id,
   });
 
-  if (!client) throw new ApiError(404, "Client not found or not assigned to you");
+  if (!client)
+    throw new ApiError(404, "Client not found or not assigned to you");
 
+  // Create a new deal
   const newDeal = new Deal({
     client: clientId,
     assignedAgent: req.user._id,
@@ -33,6 +73,7 @@ export const createDeal = asyncHandler(async (req, res) => {
     stage,
   });
 
+  // Save the new deal
   await newDeal.save();
 
   return res
@@ -84,7 +125,9 @@ export const deleteDeal = asyncHandler(async (req, res) => {
 
     return res
       .status(200)
-      .json(new ApiResponse(200, {}, "Deal and related files deleted successfully"));
+      .json(
+        new ApiResponse(200, {}, "Deal and related files deleted successfully")
+      );
   } catch (error) {
     throw new ApiError(500, error.message || "Error deleting deal");
   }
@@ -113,9 +156,20 @@ export const getDealsByClient = asyncHandler(async (req, res) => {
     assignedAgent: req.user._id,
   }).sort({ createdAt: -1 });
 
+  const dealsWithPercentage = deals.map((deal) => {
+    const dealPercentage = getDealPercentage(deal.dealTracker.stage);
+
+    return {
+      ...deal.toObject(), // Convert deal to plain object to add new fields
+      dealPercentage, // Add percentage field
+    };
+  });
+
   return res
     .status(200)
-    .json(new ApiResponse(200, deals, "Deals fetched successfully"));
+    .json(
+      new ApiResponse(200, dealsWithPercentage, "Deals fetched successfully")
+    );
 });
 
 // get deal by ID
@@ -153,14 +207,17 @@ export const upsertKeyDates = asyncHandler(async (req, res) => {
   // 🧩 Upsert Logic
   deal.keyDates = {
     targetExchangeDate: targetExchangeDate || deal.keyDates.targetExchangeDate,
-    targetCompletionDate: targetCompletionDate || deal.keyDates.targetCompletionDate,
+    targetCompletionDate:
+      targetCompletionDate || deal.keyDates.targetCompletionDate,
   };
 
   await deal.save();
 
   return res
     .status(200)
-    .json(new ApiResponse(200, deal.keyDates, "Key dates upserted successfully"));
+    .json(
+      new ApiResponse(200, deal.keyDates, "Key dates upserted successfully")
+    );
 });
 
 // buyer details
@@ -186,7 +243,13 @@ export const upsertBuyerSideDetails = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, deal.buyerDetails, "Buyer side details upserted successfully"));
+    .json(
+      new ApiResponse(
+        200,
+        deal.buyerDetails,
+        "Buyer side details upserted successfully"
+      )
+    );
 });
 // seller Details
 export const upsertSellerDetails = asyncHandler(async (req, res) => {
@@ -208,9 +271,15 @@ export const upsertSellerDetails = asyncHandler(async (req, res) => {
 
   await deal.save();
 
-  return res.status(200).json(
-    new ApiResponse(200, deal.sellerDetails, "Seller details upserted successfully")
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        deal.sellerDetails,
+        "Seller details upserted successfully"
+      )
+    );
 });
 
 // property details
@@ -234,9 +303,15 @@ export const upsertPropertyDetails = asyncHandler(async (req, res) => {
 
   await deal.save();
 
-  return res.status(200).json(
-    new ApiResponse(200, deal.propertyDetails, "Property details upserted successfully")
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        deal.propertyDetails,
+        "Property details upserted successfully"
+      )
+    );
 });
 
 // offers(Property Details)
@@ -260,9 +335,15 @@ export const upsertOffer = asyncHandler(async (req, res) => {
 
   await deal.save();
 
-  return res.status(200).json(
-    new ApiResponse(200, deal.offers, "Property details upserted successfully")
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        deal.offers,
+        "Property details upserted successfully"
+      )
+    );
 });
 
 // quick notes
@@ -291,7 +372,13 @@ export const upsertQuickNotes = asyncHandler(async (req, res) => {
 
     return res
       .status(200)
-      .json(new ApiResponse(200, deal.quickNotes, "Quick Notes updated successfully"));
+      .json(
+        new ApiResponse(
+          200,
+          deal.quickNotes,
+          "Quick Notes updated successfully"
+        )
+      );
   } catch (error) {
     throw new ApiError(500, error.message || "Error updating Quick Notes");
   }
@@ -335,7 +422,9 @@ export const uploadDealDocument = asyncHandler(async (req, res) => {
 
     return res
       .status(200)
-      .json(new ApiResponse(200, uploadedDocs, "Documents uploaded successfully"));
+      .json(
+        new ApiResponse(200, uploadedDocs, "Documents uploaded successfully")
+      );
   } catch (error) {
     throw new ApiError(500, error.message || "Error uploading deal documents");
   }
@@ -356,7 +445,13 @@ export const getDealDocuments = asyncHandler(async (req, res) => {
 
     return res
       .status(200)
-      .json(new ApiResponse(200, deal.documents, "Deal documents fetched successfully"));
+      .json(
+        new ApiResponse(
+          200,
+          deal.documents,
+          "Deal documents fetched successfully"
+        )
+      );
   } catch (error) {
     throw new ApiError(500, error.message || "Error fetching deal documents");
   }
@@ -379,15 +474,15 @@ export const deleteDealDocument = asyncHandler(async (req, res) => {
     await cloudinary.uploader.destroy(publicId);
 
     // Remove from DB
-    deal.documents = deal.documents.filter(
-      (doc) => doc.public_id !== publicId
-    );
+    deal.documents = deal.documents.filter((doc) => doc.public_id !== publicId);
 
     await deal.save();
 
     return res
       .status(200)
-      .json(new ApiResponse(200, deal.documents, "Document deleted successfully"));
+      .json(
+        new ApiResponse(200, deal.documents, "Document deleted successfully")
+      );
   } catch (error) {
     throw new ApiError(500, error.message || "Error deleting deal document");
   }
@@ -417,7 +512,13 @@ export const upsertDueDiligence = asyncHandler(async (req, res) => {
 
     return res
       .status(200)
-      .json(new ApiResponse(200, deal.dueDiligence, "Due diligence updated successfully"));
+      .json(
+        new ApiResponse(
+          200,
+          deal.dueDiligence,
+          "Due diligence updated successfully"
+        )
+      );
   } catch (error) {
     throw new ApiError(500, error.message || "Error updating due diligence");
   }
@@ -445,7 +546,8 @@ export const upsertConveyancingMilestones = async (req, res, next) => {
     // If file uploaded, upload to Cloudinary
     if (req.file) {
       const uploadedFile = await uploadOnCloudinary(req.file.path);
-      if (!uploadedFile?.secure_url) throw new ApiError(500, "File upload failed");
+      if (!uploadedFile?.secure_url)
+        throw new ApiError(500, "File upload failed");
 
       milestoneData.file = {
         url: uploadedFile.secure_url,
@@ -510,13 +612,15 @@ export const upsertOptionalMilestones = asyncHandler(async (req, res) => {
 
   await deal.save();
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      deal.optionalMilestones,
-      "Optional milestones upserted successfully"
-    )
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        deal.optionalMilestones,
+        "Optional milestones upserted successfully"
+      )
+    );
 });
 
 export const upsertFinancialDetails = asyncHandler(async (req, res) => {
@@ -539,15 +643,20 @@ export const upsertFinancialDetails = asyncHandler(async (req, res) => {
 
     await deal.save();
 
-    return res.status(200).json(
-      new ApiResponse(
-        200,
-        deal.financialDetails,
-        "Financial details upserted successfully"
-      )
-    );
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          deal.financialDetails,
+          "Financial details upserted successfully"
+        )
+      );
   } catch (error) {
-    throw new ApiError(500, error.message || "Error upserting financial details");
+    throw new ApiError(
+      500,
+      error.message || "Error upserting financial details"
+    );
   }
 });
 
@@ -558,7 +667,10 @@ export const upsertDealTracker = asyncHandler(async (req, res) => {
 
   if (!dealId) throw new ApiError(400, "Deal ID is required");
   if (!stage)
-    throw new ApiError(400, "Stage is required (Discovery, Viewings, Offer Mode, Offer Accepted, Exchange, Completion)");
+    throw new ApiError(
+      400,
+      "Stage is required (Discovery, Viewings, Offer Mode, Offer Accepted, Exchange, Completion)"
+    );
 
   const validStages = [
     "Discovery",
@@ -582,7 +694,13 @@ export const upsertDealTracker = asyncHandler(async (req, res) => {
 
   await deal.save();
 
-  return res.status(200).json(
-    new ApiResponse(200, deal.dealTracker, "Deal tracker updated successfully")
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        deal.dealTracker,
+        "Deal tracker updated successfully"
+      )
+    );
 });

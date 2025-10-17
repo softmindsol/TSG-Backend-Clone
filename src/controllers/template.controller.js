@@ -100,6 +100,16 @@ export const fillTemplate = asyncHandler(async (req, res) => {
     SolicitorName: deal?.buyerDetails?.buyerSolicitorName || "",
     ClientFirstName: client?.clientName,
     MortgageBrokerName: deal?.buyerDetails?.mortgageBrokerName || "",
+    PropertyCategory: client?.buyingPreference?.propertyType,
+    ClientType: client?.clientType,
+    ReasonForPurchase: client?.buyingPreference?.reasonForMove,
+    BudgetMin: client?.buyingPreference?.budget.min,
+    BudgetMax: client?.buyingPreference?.budget.max,
+    Timeframe: client?.buyingPreference?.timeframe,
+    DesignStyle: client?.buyingPreference?.designStyle,
+
+    
+
   };
 
   const filledSubject = replacePlaceholders(template.subject, data);

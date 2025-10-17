@@ -5,10 +5,23 @@ import ApiError from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { v2 as cloudinary } from "cloudinary";
+import Deal from "../models/deal.model.js";
 // Function to generate unique client code
 const generateClientCode = () => {
   const randomStr = Math.random().toString(36).substring(2, 8); // 6 char random string
   return `CLT-${randomStr}`;
+};
+const getDealPercentage = (stage) => {
+  const stagePercentages = {
+    Discovery: 0,
+    Viewings: 16.67,
+    "Offer Mode": 33.33,
+    "Offer Accepted": 50,
+    Exchange: 83.33,
+    Completion: 100,
+  };
+
+  return stagePercentages[stage] || 0; // Default to 0% if stage is invalid
 };
 
 export const createClient = asyncHandler(async (req, res) => {
@@ -19,7 +32,7 @@ export const createClient = asyncHandler(async (req, res) => {
       phoneNumber,
       clientType,
       address,
-amlStatus,
+      amlStatus,
       currentPosition,
       budgetMin,
       budgetMax,
@@ -39,29 +52,29 @@ amlStatus,
       throw new ApiError(400, "Client name and email are required");
     }
     const existingClient = await Client.findOne({
-    clientEmail: clientEmail.toLowerCase().trim(),
-    assignedAgent: req.user._id,
-  });
+      clientEmail: clientEmail.toLowerCase().trim(),
+      assignedAgent: req.user._id,
+    });
 
-  if (existingClient) {
-    throw new ApiError(409, "Client with this email already exists");
-  }
+    if (existingClient) {
+      throw new ApiError(409, "Client with this email already exists");
+    }
 
     // Upload document to Cloudinary if provided
     let uploadedDocs = [];
     if (req.files && req.files.length > 0) {
-        for (let file of req.files) {
-            const uploadedDoc = await uploadOnCloudinary(file.path);
-            uploadedDocs.push({
-                url: uploadedDoc.secure_url,
-                public_id: uploadedDoc.public_id,
-                filename: file.originalname,
-                size: file.size,
-                format: file.mimetype,
-            });
-        }
+      for (let file of req.files) {
+        const uploadedDoc = await uploadOnCloudinary(file.path);
+        uploadedDocs.push({
+          url: uploadedDoc.secure_url,
+          public_id: uploadedDoc.public_id,
+          filename: file.originalname,
+          size: file.size,
+          format: file.mimetype,
+        });
+      }
     }
-    console.log("🚀 ~ uploadedDocs:", uploadedDocs)
+    console.log("🚀 ~ uploadedDocs:", uploadedDocs);
 
     const newClient = await Client.create({
       clientCode: generateClientCode(),
@@ -104,7 +117,7 @@ amlStatus,
 export const getAllClients = asyncHandler(async (req, res) => {
   // ✅ Parse and validate query params
   let { page = 1, limit = 10, search, clientType } = req.query;
-  
+
   page = Math.max(1, parseInt(page) || 1);
   limit = Math.min(Math.max(1, parseInt(limit) || 10), 100); // Min 1, Max 100
 
@@ -137,6 +150,22 @@ export const getAllClients = asyncHandler(async (req, res) => {
     Client.countDocuments(query),
   ]);
 
+  // For each client, calculate the average deal percentage
+  for (let client of clients) {
+    // Fetch all deals for the client
+    const deals = await Deal.find({ client: client._id }).lean();
+
+    // Calculate the average deal percentage
+    const totalPercentage = deals.reduce((acc, deal) => {
+      return acc + (deal.dealTracker ? getDealPercentage(deal.dealTracker.stage) : 0);
+    }, 0);
+    
+    const averageDealPercentage = deals.length > 0 ? totalPercentage / deals.length : 0;
+    
+    // Add the average percentage to the client object
+    client.averageDealPercentage = averageDealPercentage;
+  }
+
   return res.status(200).json(
     new ApiResponse(
       200,
@@ -154,6 +183,7 @@ export const getAllClients = asyncHandler(async (req, res) => {
     )
   );
 });
+
 // update client
 
 export const updateClient = asyncHandler(async (req, res) => {
@@ -255,7 +285,10 @@ export const deleteClient = asyncHandler(async (req, res) => {
         try {
           await cloudinary.uploader.destroy(doc.public_id);
         } catch (err) {
-          console.error(`❌ Error deleting file ${doc.public_id} from Cloudinary:`, err.message);
+          console.error(
+            `❌ Error deleting file ${doc.public_id} from Cloudinary:`,
+            err.message
+          );
         }
       }
     }
@@ -274,7 +307,7 @@ export const deleteClient = asyncHandler(async (req, res) => {
 export const getClientById = asyncHandler(async (req, res) => {
   try {
     const { clientId } = req.params;
-    console.log("🚀 ~ clientId:", clientId)
+    console.log("🚀 ~ clientId:", clientId);
 
     // 🔍 Find client only if assigned to this agent
     const client = await Client.findOne({
@@ -327,9 +360,9 @@ export const uploadClientDocument = asyncHandler(async (req, res) => {
     client.documents.push(docObj);
     await client.save();
 
-    return res.status(200).json(
-      new ApiResponse(200, client, "Document uploaded successfully")
-    );
+    return res
+      .status(200)
+      .json(new ApiResponse(200, client, "Document uploaded successfully"));
   } catch (error) {
     throw new ApiError(500, error.message || "Error uploading document");
   }
@@ -365,9 +398,9 @@ export const deleteClientDocument = asyncHandler(async (req, res) => {
 
     await client.save();
 
-    return res.status(200).json(
-      new ApiResponse(200, client, "Document deleted successfully")
-    );
+    return res
+      .status(200)
+      .json(new ApiResponse(200, client, "Document deleted successfully"));
   } catch (error) {
     throw new ApiError(500, error.message || "Error deleting document");
   }
@@ -385,7 +418,8 @@ export const addJournalEntry = asyncHandler(async (req, res) => {
       assignedAgent: req.user._id,
     });
 
-    if (!client) throw new ApiError(404, "Client not found or not assigned to you");
+    if (!client)
+      throw new ApiError(404, "Client not found or not assigned to you");
 
     client.journal.push({
       note,
@@ -396,7 +430,9 @@ export const addJournalEntry = asyncHandler(async (req, res) => {
 
     return res
       .status(201)
-      .json(new ApiResponse(201, client.journal, "Journal entry added successfully"));
+      .json(
+        new ApiResponse(201, client.journal, "Journal entry added successfully")
+      );
   } catch (error) {
     throw new ApiError(500, error.message || "Error adding journal entry");
   }
@@ -418,13 +454,17 @@ export const getJournalEntries = asyncHandler(async (req, res) => {
     }
 
     return res.status(200).json(
-      new ApiResponse(200, {
-        journal: client.journal,
-        assignedAgent: {
-          name: client.assignedAgent?.firstName || "N/A",
-          email: client.assignedAgent?.email || "N/A",
+      new ApiResponse(
+        200,
+        {
+          journal: client.journal,
+          assignedAgent: {
+            name: client.assignedAgent?.firstName || "N/A",
+            email: client.assignedAgent?.email || "N/A",
+          },
         },
-      }, "Journal fetched successfully")
+        "Journal fetched successfully"
+      )
     );
   } catch (error) {
     throw new ApiError(500, error.message || "Error fetching journal");
@@ -469,6 +509,3 @@ export const getJournalEntries = asyncHandler(async (req, res) => {
 //     throw new ApiError(500, error.message || "Error deleting journal entry");
 //   }
 // });
-
-
-

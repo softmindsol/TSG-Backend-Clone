@@ -15,6 +15,6 @@ router.post("/login-agent", loginAgent);
 
 router.post("/change-password", verifyJWT, changePassword);
 // Admin Approves Agent
-router.patch("/approve-agent/:id", approveAgent);
+
 
 export default router;
