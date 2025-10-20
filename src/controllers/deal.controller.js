@@ -27,7 +27,7 @@ const getDealPercentage = (stage) => {
 // Create a new deal
 // =========================
 export const createDeal = asyncHandler(async (req, res) => {
-  
+  console.log("testing");
   const { clientId } = req.params;
   const {  propertyAddress, dealType, stage } = req.body;
 
