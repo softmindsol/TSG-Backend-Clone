@@ -27,7 +27,9 @@ const BuyingPreferenceSchema = new Schema(
     reasonForMove: { type: String, default: null },
     timeframe: { type: String, default: null }, // e.g. "6-9 months"
     designStyle: { type: String, default: null },
-    dealBreakers: { type: [String], default: [] },
+    mustHaves: { type: [String], default: null },
+    avoids: { type: [String], default: null },
+
     purchaseMethod: { type: String, default: null }, // e.g. "mortgage", "cash"
     preferredLocation: { type: String, default: null },
     quickNotes: { type: String, default: null },
@@ -122,8 +124,7 @@ const ClientSchema = new Schema(
 
     clientType: {
       type: String,
-      enum: ["individual", "business"],
-      default: "individual",
+      required: true,
     },
     amlStatus: {
       type: String,

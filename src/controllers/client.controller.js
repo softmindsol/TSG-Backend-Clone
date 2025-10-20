@@ -42,7 +42,8 @@ export const createClient = asyncHandler(async (req, res) => {
       reasonForMove,
       timeFrame,
       designStyle,
-      dealBreakers,
+      mustHaves,
+      avoids,
       purchaseMethod,
       preferredLocation,
       quickNotes,
@@ -51,6 +52,7 @@ export const createClient = asyncHandler(async (req, res) => {
     if (!clientName || !clientEmail) {
       throw new ApiError(400, "Client name and email are required");
     }
+
     const existingClient = await Client.findOne({
       clientEmail: clientEmail.toLowerCase().trim(),
       assignedAgent: req.user._id,
@@ -60,7 +62,7 @@ export const createClient = asyncHandler(async (req, res) => {
       throw new ApiError(409, "Client with this email already exists");
     }
 
-    // Upload document to Cloudinary if provided
+    // Upload documents to Cloudinary if provided
     let uploadedDocs = [];
     if (req.files && req.files.length > 0) {
       for (let file of req.files) {
@@ -74,7 +76,19 @@ export const createClient = asyncHandler(async (req, res) => {
         });
       }
     }
-    console.log("🚀 ~ uploadedDocs:", uploadedDocs);
+
+    // 🧠 Handle mustHaves and avoids (support both array or comma-separated string)
+    const parsedMustHaves = Array.isArray(mustHaves)
+      ? mustHaves
+      : mustHaves
+      ? mustHaves.split(",").map((item) => item.trim())
+      : [];
+
+    const parsedAvoids = Array.isArray(avoids)
+      ? avoids
+      : avoids
+      ? avoids.split(",").map((item) => item.trim())
+      : [];
 
     const newClient = await Client.create({
       clientCode: generateClientCode(),
@@ -84,7 +98,6 @@ export const createClient = asyncHandler(async (req, res) => {
       clientType,
       address,
       amlStatus,
-
       currentPosition,
       buyingPreference: {
         budget: {
@@ -97,13 +110,14 @@ export const createClient = asyncHandler(async (req, res) => {
         reasonForMove: reasonForMove || null,
         timeframe: timeFrame || null,
         designStyle: designStyle || null,
-        dealBreakers: dealBreakers ? dealBreakers.split(",") : [],
+        mustHaves: parsedMustHaves,
+        avoids: parsedAvoids,
         purchaseMethod: purchaseMethod || null,
         preferredLocation: preferredLocation || null,
         quickNotes: quickNotes || null,
       },
       documents: uploadedDocs,
-      assignedAgent: req.user._id, // from verifyJWT
+      assignedAgent: req.user._id,
     });
 
     return res
@@ -113,6 +127,7 @@ export const createClient = asyncHandler(async (req, res) => {
     throw new ApiError(500, error.message || "Error creating client");
   }
 });
+
 
 export const getAllClients = asyncHandler(async (req, res) => {
   // ✅ Parse and validate query params
@@ -200,7 +215,7 @@ export const updateClient = asyncHandler(async (req, res) => {
       throw new ApiError(404, "Client not found or not assigned to you");
     }
 
-    // ✅ Update normal fields (shallow merge)
+    // ✅ Update normal top-level fields
     const allowedFields = [
       "clientName",
       "clientEmail",
@@ -216,11 +231,10 @@ export const updateClient = asyncHandler(async (req, res) => {
       }
     });
 
-    // ✅ Update buying preferences (deep merge for nested fields)
+    // ✅ Update buying preferences (deep merge)
     if (req.body.buyingPreference) {
       const bp = req.body.buyingPreference;
 
-      // loop over keys of buyingPreference
       Object.keys(bp).forEach((key) => {
         if (bp[key] !== undefined) {
           if (key === "budget" && typeof bp[key] === "object") {
@@ -231,29 +245,29 @@ export const updateClient = asyncHandler(async (req, res) => {
             if (bp[key].max !== undefined) {
               client.buyingPreference.budget.max = bp[key].max;
             }
-          } else {
-            // handle all other buyingPreference fields normally
+          }
+
+          // 🧠 handle mustHaves & avoids (convert string -> array)
+          else if (key === "mustHaves" || key === "avoids") {
+            if (Array.isArray(bp[key])) {
+              client.buyingPreference[key] = bp[key];
+            } else if (typeof bp[key] === "string") {
+              client.buyingPreference[key] = bp[key]
+                .split(",")
+                .map((item) => item.trim())
+                .filter((item) => item.length > 0);
+            } else {
+              client.buyingPreference[key] = [];
+            }
+          }
+
+          // all other normal fields
+          else {
             client.buyingPreference[key] = bp[key];
           }
         }
       });
     }
-
-    // ✅ Handle file uploads (append new docs to array)
-    // if (req.files && req.files.length > 0) {
-    //   for (let file of req.files) {
-    //     const uploadedDoc = await uploadOnCloudinary(file.path);
-    //     if (uploadedDoc) {
-    //       client.documents.push({
-    //         url: uploadedDoc.secure_url,
-    //         public_id: uploadedDoc.public_id,
-    //         filename: file.originalname,
-    //         size: file.size,
-    //         format: file.mimetype,
-    //       });
-    //     }
-    //   }
-    // }
 
     await client.save();
 
@@ -264,6 +278,7 @@ export const updateClient = asyncHandler(async (req, res) => {
     throw new ApiError(500, error.message || "Error updating client");
   }
 });
+
 
 export const deleteClient = asyncHandler(async (req, res) => {
   try {
