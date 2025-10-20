@@ -6,7 +6,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "build": "echo 'No build step needed for plain JS backend'"
   },
   "repository": {
     "type": "git",
