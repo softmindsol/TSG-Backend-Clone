@@ -242,13 +242,8 @@ const DealSchema = new Schema(
     propertyAddress: { type: String, default: null },
     dealType: {
       type: String,
-      enum: [
-        "Residential Sourcing",
-        "Residential Rental",
-        "Commercial Sourcing",
-        "Commercial Rental",
-      ],
-      required: true,  // Make sure dealType is always provided
+      enum: ["Buyer Rep", "Seller Rep", "Development", "Investment"],
+      required: true, // Ensure dealType is always provided
     },
     stage: {
       type: String,
@@ -260,7 +255,7 @@ const DealSchema = new Schema(
         "Exchange",
         "Completion",
       ],
-      required: true,  // Ensure the stage is always provided
+      required: true, // Ensure the stage is always provided
     },
 
     client: { type: Schema.Types.ObjectId, ref: "Client", required: true },
