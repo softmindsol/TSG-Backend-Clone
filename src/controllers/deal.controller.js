@@ -29,7 +29,7 @@ const getDealPercentage = (stage) => {
 export const createDeal = asyncHandler(async (req, res) => {
   console.log("testing");
   const { clientId } = req.params;
-  const { dealName, propertyAddress, dealType, stage } = req.body;
+  const {  propertyAddress, dealType, stage } = req.body;
 
   // Define valid stages
   const validStages = [
@@ -42,7 +42,7 @@ export const createDeal = asyncHandler(async (req, res) => {
   ];
 
   // Validate the required fields
-  if (!dealName || !propertyAddress || !dealType || !stage) {
+  if ( !propertyAddress || !dealType || !stage) {
     throw new ApiError(400, "All fields are required");
   }
 
@@ -67,7 +67,6 @@ export const createDeal = asyncHandler(async (req, res) => {
   const newDeal = new Deal({
     client: clientId,
     assignedAgent: req.user._id,
-    dealName,
     propertyAddress,
     dealType,
     stage,

@@ -238,7 +238,7 @@ const DealTrackerSchema = new Schema({
 // ===== Main Deal Schema =====
 const DealSchema = new Schema(
   {
-    dealName: { type: String, required: true, trim: true },
+    // dealName: { type: String, required: true, trim: true },
     propertyAddress: { type: String, default: null },
     dealType: {
       type: String,
