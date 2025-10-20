@@ -152,11 +152,7 @@ const ClientSchema = new Schema(
     journal: [
       {
         note: { type: String, required: true },
-        status: {
-          type: String,
-          enum: ["General", "Follow-up", "Call", "Meeting", "Closed"],
-          default: "General",
-        },
+        status: { type: String, required: true }, // no enum restriction
         createdAt: { type: Date, default: Date.now },
       },
     ],
