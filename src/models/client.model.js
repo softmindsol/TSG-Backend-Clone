@@ -94,6 +94,11 @@ const VerificationTimelineSchema = new Schema(
 
 const ClientSchema = new Schema(
   {
+     buyingPreference: {
+      type: BuyingPreferenceSchema,
+      default: () => ({}),
+    },
+
     clientCode: {
       type: String,
       required: true,
@@ -141,11 +146,7 @@ const ClientSchema = new Schema(
 
     extraContacts: { type: [ExtraContactSchema], default: [] },
     verificationTimeline: { type: [VerificationTimelineSchema], default: [] },
-    buyingPreference: {
-      type: BuyingPreferenceSchema,
-      default: () => ({}),
-    },
-
+   
     documents: {
       type: [DocumentSchema],
       default: [],

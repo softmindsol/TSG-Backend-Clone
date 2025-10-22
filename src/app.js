@@ -13,7 +13,9 @@ import templateRoutes from "./routes/template.routes.js";
 import reportRoutes from "./routes/report.routes.js";
 import documentRoutes from "./routes/document.routes.js";
 import adminRoutes from "./routes/adminRoutes/admin.routes.js";
+import aiRoutes from "./routes/ai.routes.js"
 
+import rateLimit from "express-rate-limit";
 dotenv.config();
 const app = express();
 
@@ -30,6 +32,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(helmet());
+const aiLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,          // 5 minutes
+  max: 60,                          // 60 requests / window / IP (tune per user later)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { statusCode: 429, message: "Too many requests" },
+});
 
 // Routes
 app.get("/", (req, res) => res.send("Welcome to TSG Backend"));
@@ -42,6 +51,8 @@ app.use("/api/template", templateRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/ai", aiLimiter, aiRoutes);
+
 
 // Global error handler
 app.use((err, req, res, next) => {
