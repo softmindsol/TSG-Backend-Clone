@@ -1,6 +1,7 @@
 import express from "express";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import {
+  commissionSummaryController,
   createDeal,
   deleteDeal,
   deleteDealDocument,
@@ -10,6 +11,7 @@ import {
   uploadDealDocument,
   upsertBuyerSideDetails,
   upsertConveyancingMilestones,
+  upsertDealCommissionController,
   upsertDealTracker,
   upsertDueDiligence,
   upsertFinancialDetails,
@@ -80,6 +82,10 @@ router.put(
 
 router.patch("/financial-details/:dealId", verifyJWT, upsertFinancialDetails);
 
+router.put("/commission/:dealId", verifyJWT, upsertDealCommissionController);
+
+// routes
+router.get("/commission/summary", verifyJWT, commissionSummaryController);
 
 
 export default router;
