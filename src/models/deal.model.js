@@ -2,10 +2,12 @@
 import mongoose from "mongoose";
 
 const { Schema } = mongoose;
-
+import { COMMISSION_ENGAGEMENTS, COMMISSION_TYPES } from "./client.model.js";
 // ===== Subschemas placeholders =====
 
 // Key Dates
+
+
 
 const KeyDatesSchema = new Schema(
   {
@@ -236,40 +238,35 @@ const DealTrackerSchema = new Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
-const CommissionSchema = new Schema(
+const CommissionSettingsSnapshotSchema = new Schema(
   {
-    // One client file = one engagement
-    engagementType: {
-      type: String,
-      enum: ["Sourcing", "Rental"],
-      required: true,
-    },
-
-    // Sourcing only
-    sourcing: {
-      commissionType: {
-        type: String,
-        enum: ["Percentage", "Fixed"],
-        default: null,
-      },
-      offerPrice: { type: Number, default: null }, // e.g., 650000
-      ratePct: { type: Number, default: null }, // e.g., 2.0 → 2%
-      fixedFee: { type: Number, default: null }, // e.g., 5000
-    },
-
-    // Rental only
-    rental: {
-      monthlyRent: { type: Number, default: null }, // e.g., 2000
-      months: { type: Number, default: null }, // e.g., 1
-    },
-
-    // Computed + display helpers
-    net: { type: Number, default: 0 }, // excludes VAT
-    vat: { type: Number, default: 0 }, // 20% of net
-    currency: { type: String, default: "GBP" },
+    engagementType: { type: String, enum: COMMISSION_ENGAGEMENTS },
+    commissionType: { type: String, enum: COMMISSION_TYPES },
+    ratePct: { type: Number, default: null },
+    fixedFee: { type: Number, default: null },
   },
   { _id: false }
 );
+
+const CommissionComputedSchema = new Schema(
+  {
+    net: { type: Number, default: 0 }, // excludes VAT
+    vat: { type: Number, default: 0 }, // 20% of net (configurable later)
+    currency: { type: String, default: "GBP" },
+
+    source: {
+      offerId: { type: Schema.Types.ObjectId, default: null }, // optional if offers ever become an array
+      offerAmount: { type: Number, default: 0 },
+      settingsSnapshot: {
+        type: CommissionSettingsSnapshotSchema,
+        default: undefined,
+      },
+      computedAt: { type: Date, default: null },
+    },
+  },
+  { _id: false }
+);
+
 // ===== Main Deal Schema =====
 const DealSchema = new Schema(
   {
@@ -315,7 +312,11 @@ const DealSchema = new Schema(
       default: [],
     },
     optionalMilestones: { type: [OptionalMilestonesSchema], default: [] },
-    commission: { type: CommissionSchema, default: () => ({}) },
+    commissionComputed: {
+      type: CommissionComputedSchema,
+      default: () => ({}),
+    },
+    
     stageUpdatedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
@@ -324,29 +325,29 @@ DealSchema.index({ assignedAgent: 1, stage: 1, stageUpdatedAt: -1 });
 DealSchema.index({ client: 1, createdAt: -1 });
 
 // Recompute commission when commission block changes
-DealSchema.methods.recomputeCommission = function () {
-  const VAT_RATE = 0.2;
-  const c = this.commission || {};
-  let net = 0;
+// DealSchema.methods.recomputeCommission = function () {
+//   const VAT_RATE = 0.2;
+//   const c = this.commission || {};
+//   let net = 0;
 
-  if (c.engagementType === "Sourcing") {
-    if (c.sourcing?.commissionType === "Percentage") {
-      const base = Number(c.sourcing?.offerPrice || 0);
-      const rate = Number(c.sourcing?.ratePct || 0) / 100;
-      net = base * rate;
-    } else if (c.sourcing?.commissionType === "Fixed") {
-      net = Number(c.sourcing?.fixedFee || 0);
-    }
-  } else if (c.engagementType === "Rental") {
-    const rent = Number(c.rental?.monthlyRent || 0);
-    const months = Number(c.rental?.months || 0);
-    net = rent * months;
-  }
+//   if (c.engagementType === "Sourcing") {
+//     if (c.sourcing?.commissionType === "Percentage") {
+//       const base = Number(c.sourcing?.offerPrice || 0);
+//       const rate = Number(c.sourcing?.ratePct || 0) / 100;
+//       net = base * rate;
+//     } else if (c.sourcing?.commissionType === "Fixed") {
+//       net = Number(c.sourcing?.fixedFee || 0);
+//     }
+//   } else if (c.engagementType === "Rental") {
+//     const rent = Number(c.rental?.monthlyRent || 0);
+//     const months = Number(c.rental?.months || 0);
+//     net = rent * months;
+//   }
 
-  c.net = Math.max(0, Number(net.toFixed(2)));
-  c.vat = Number((c.net * VAT_RATE).toFixed(2));
-  this.commission = c;
-};
+//   c.net = Math.max(0, Number(net.toFixed(2)));
+//   c.vat = Number((c.net * VAT_RATE).toFixed(2));
+//   this.commission = c;
+// };
 
 DealSchema.pre("save", function (next) {
   // bump stageUpdatedAt when stage changes (used later by dashboard)

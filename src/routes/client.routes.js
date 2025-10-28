@@ -6,10 +6,12 @@ import {
   deleteClient,
   deleteClientDocument,
   getAllClients,
+  getAllClientsSimple,
   getClientById,
   getJournalEntries,
   updateClient,
   uploadClientDocument,
+  upsertClientCommissionSettings,
 } from "../controllers/client.controller.js";
 
 import { upload } from "../middleware/multer.middleware.js";
@@ -20,6 +22,7 @@ import {
   editExtraContact,
   getAllExtraContacts,
 } from "../controllers/extracontact.controller.js";
+import { clientCommissionSummary } from "../controllers/commission.summary.controller.js";
 
 const router = express.Router();
 
@@ -30,6 +33,9 @@ router.post(
   createClient
 );
 router.get("/get-all-clients", verifyJWT, getAllClients);
+
+router.get("/get-simple-clients", verifyJWT, getAllClientsSimple);
+
 
 router.patch(
   "/update-client/:clientId",
@@ -75,6 +81,10 @@ router.delete(
 
 // Get all extra contacts for a specific client
 router.get("/get-extra-contacts/:clientId", verifyJWT, getAllExtraContacts);
+
+router.put("/calculateCommissionSettings/:clientId", verifyJWT, upsertClientCommissionSettings)
+
+router.get("/client-commission-summary/:clientId", verifyJWT, clientCommissionSummary);
 
 // router.delete(
 //   "/delete-client/:clientId/journal/:journalId",

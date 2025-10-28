@@ -1,7 +1,7 @@
 import express from "express";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import {
-  commissionSummaryController,
+
   createDeal,
   deleteDeal,
   deleteDealDocument,
@@ -11,7 +11,7 @@ import {
   uploadDealDocument,
   upsertBuyerSideDetails,
   upsertConveyancingMilestones,
-  upsertDealCommissionController,
+  
   upsertDealTracker,
   upsertDueDiligence,
   upsertFinancialDetails,
@@ -23,6 +23,7 @@ import {
   upsertSellerDetails,
 } from "../controllers/deal.controller.js";
 import { upload } from "../middleware/multer.middleware.js";
+import { commissionSummaryController } from "../controllers/commission.summary.controller.js";
 
 const router = express.Router();
 
@@ -82,10 +83,6 @@ router.put(
 
 router.patch("/financial-details/:dealId", verifyJWT, upsertFinancialDetails);
 
-router.put("/commission/:dealId", verifyJWT, upsertDealCommissionController);
-
-// routes
 router.get("/commission/summary", verifyJWT, commissionSummaryController);
-
 
 export default router;

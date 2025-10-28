@@ -4,6 +4,9 @@ import crypto from "crypto";
 
 const { Schema } = mongoose;
 
+export const COMMISSION_ENGAGEMENTS = ["Sourcing", "Rental"];
+export const COMMISSION_TYPES = ["Percentage", "Fixed"];
+
 const DocumentSchema = new Schema(
   {
     url: { type: String, required: true },
@@ -92,9 +95,28 @@ const VerificationTimelineSchema = new Schema(
   { _id: false }
 );
 
+const CommissionSettingsSchema = new Schema(
+  {
+    engagementType: {
+      type: String,
+      enum: COMMISSION_ENGAGEMENTS,
+      required: true,
+    },
+    commissionType: { type: String, enum: COMMISSION_TYPES, required: true },
+
+    // Only one of these is used based on commissionType
+    ratePct: { type: Number, min: 0, default: null }, // e.g., 1.5 (%)
+    fixedFee: { type: Number, min: 0, default: null }, // e.g., 5000
+
+    currency: { type: String, default: "GBP" },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const ClientSchema = new Schema(
   {
-     buyingPreference: {
+    buyingPreference: {
       type: BuyingPreferenceSchema,
       default: () => ({}),
     },
@@ -146,10 +168,14 @@ const ClientSchema = new Schema(
 
     extraContacts: { type: [ExtraContactSchema], default: [] },
     verificationTimeline: { type: [VerificationTimelineSchema], default: [] },
-   
+
     documents: {
       type: [DocumentSchema],
       default: [],
+    },
+    commissionSettings: {
+      type: CommissionSettingsSchema,
+      default: null, // or use `default: () => ({})` if you want it auto-created
     },
     journal: [
       {

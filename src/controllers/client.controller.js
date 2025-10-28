@@ -1,11 +1,13 @@
 // controllers/client.controller.js
-import Client from "../models/client.model.js";
+import Client, { COMMISSION_ENGAGEMENTS, COMMISSION_TYPES } from "../models/client.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { v2 as cloudinary } from "cloudinary";
 import Deal from "../models/deal.model.js";
+import Joi from "joi";
+import { recomputeAllDealsForClient } from "../utils/deal.service.js";
 // Function to generate unique client code
 const generateClientCode = () => {
   const randomStr = Math.random().toString(36).substring(2, 8); // 6 char random string
@@ -22,6 +24,53 @@ const getDealPercentage = (stage) => {
   };
 
   return stagePercentages[stage] || 0; // Default to 0% if stage is invalid
+};
+const upsertSettingsSchema = Joi.object({
+  engagementType: Joi.string().valid(...COMMISSION_ENGAGEMENTS).required(),
+  commissionType: Joi.string().valid(...COMMISSION_TYPES).required(),
+  ratePct: Joi.number().min(0).when("commissionType", {
+    is: "Percentage",
+    then: Joi.required(),
+    otherwise: Joi.forbidden(),
+  }),
+  fixedFee: Joi.number().min(0).when("commissionType", {
+    is: "Fixed",
+    then: Joi.required(),
+    otherwise: Joi.forbidden(),
+  }),
+  currency: Joi.string().default("GBP"),
+});
+
+export const upsertClientCommissionSettings = async (req, res, next) => {
+  try {
+    const { error, value } = upsertSettingsSchema.validate(req.body, {
+      abortEarly: false,
+      convert: true,
+      stripUnknown: true,
+    });
+    if (error) {
+      throw new ApiError(400, error.details.map((d) => d.message).join(", "));
+    }
+
+    const { clientId } = req.params;
+    const client = await Client.findOne({
+      _id: clientId,
+      assignedAgent: req.user._id, // tenancy guard
+    });
+    if (!client) throw new ApiError(404, "Client not found or not assigned to you");
+
+    client.commissionSettings = { ...value, updatedAt: new Date() };
+    await client.save();
+
+    // Recompute all accepted-offer deals under this client
+    const bulk = await recomputeAllDealsForClient({ clientId });
+
+    res.status(200).json(
+      new ApiResponse(200, { commissionSettings: client.commissionSettings, bulk }, "Commission settings saved"),
+    );
+  } catch (err) {
+    next(err);
+  }
 };
 
 export const createClient = asyncHandler(async (req, res) => {
@@ -198,6 +247,35 @@ export const getAllClients = asyncHandler(async (req, res) => {
     )
   );
 });
+
+export const getAllClientsSimple = asyncHandler(async (req, res) => {
+  // ✅ Only fetch clients assigned to the logged-in user
+  const query = { assignedAgent: req.user._id };
+
+  // ✅ Optional filters
+  const { search } = req.query;
+
+  if (search) {
+    query.$or = [
+      { clientName: { $regex: search, $options: "i" } },
+      { clientEmail: { $regex: search, $options: "i" } },
+      { clientCode: { $regex: search, $options: "i" } },
+    ];
+  }
+
+
+
+  // ✅ Fetch only name and id (lean for performance)
+  const clients = await Client.find(query)
+    .select("_id clientName")
+    .sort({ clientName: 1 })
+    .lean();
+
+  return res.status(200).json(
+    new ApiResponse(200, { clients }, "Clients (simple list) fetched successfully")
+  );
+});
+
 
 // update client
 

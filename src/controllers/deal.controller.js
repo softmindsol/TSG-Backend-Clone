@@ -9,11 +9,9 @@ import {
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
 import { v2 as cloudinary } from "cloudinary";
-import {
-  updateDealStageService,
-  upsertDealCommissionService,
-} from "../utils/deal.service.js";
+
 import { upsertCommissionSchema } from "../validation/dealCommission.schema.js";
+import { recomputeDealCommission, updateDealStageService } from "../utils/deal.service.js";
 
 const getDealPercentage = (stage) => {
   const stagePercentages = {
@@ -28,20 +26,7 @@ const getDealPercentage = (stage) => {
   return stagePercentages[stage] || 0; // Default to 0% if stage is invalid
 };
 
-function buildTimeFilter(scope = "month") {
-  const now = new Date();
-  if (scope === "all") return { $gte: new Date("1970-01-01"), $lte: now };
 
-  const start = new Date(now);
-  switch (scope) {
-    case "week":    start.setDate(start.getDate() - 7); break;
-    case "month":   start.setMonth(start.getMonth() - 1); break;
-    case "quarter": start.setMonth(start.getMonth() - 3); break;
-    case "year":    start.setFullYear(start.getFullYear() - 1); break;
-    default:        start.setMonth(start.getMonth() - 1); // fallback to month
-  }
-  return { $gte: start, $lte: now };
-}
 
 // =========================
 // Create a new deal
@@ -354,32 +339,37 @@ export const upsertPropertyDetails = asyncHandler(async (req, res) => {
 
 export const upsertOffer = asyncHandler(async (req, res) => {
   const { dealId } = req.params;
-  const data = req.body;
+  const patch = req.body;
 
   const deal = await Deal.findOne({
     _id: dealId,
-    assignedAgent: req.user._id,
+    assignedAgent: req.user._id, // tenancy
   });
-
   if (!deal) throw new ApiError(404, "Deal not found or not assigned to you");
 
-  // 🧩 Merge data
+  // Merge incoming fields into the single offers subdoc
   deal.offers = {
-    ...deal.offers.toObject(),
-    ...data,
+    ...(deal.offers?.toObject?.() ?? deal.offers ?? {}),
+    ...patch,
   };
 
   await deal.save();
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        deal.offers,
-        "Property details upserted successfully"
-      )
-    );
+  // Compute/clear commissionComputed based on (client settings + offer Accepted)
+  const computed = await recomputeDealCommission({ dealId });
+
+  // Optional: include a quick bucket hint for the UI (Expected/Earned/null)
+  let bucket = null;
+  if (deal.stage === "Offer Accepted") bucket = "Expected";
+  else if (deal.stage === "Exchange") bucket = "Earned";
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      offers: deal.offers,
+      commissionComputed: computed || null,
+      bucket,
+    }, "Offer upserted successfully")
+  );
 });
 
 // quick notes
@@ -697,7 +687,7 @@ export const upsertFinancialDetails = asyncHandler(async (req, res) => {
 });
 
 //deal tracker
-// deal tracker (stage update via service, keep dealTracker for BC)
+
 export const upsertDealTracker = asyncHandler(async (req, res) => {
   const { dealId } = req.params;
   const { stage, note } = req.body;
@@ -714,8 +704,8 @@ export const upsertDealTracker = asyncHandler(async (req, res) => {
   if (!stage || !validStages.includes(stage)) {
     throw new ApiError(400, "Invalid or missing stage");
   }
+ await recomputeDealCommission({ dealId });
 
-  // call the same service we use for stage updates (with commission guard)
   const updated = await updateDealStageService({
     dealId,
     agentId: req.user?.agentId, // from verifyJWT
@@ -741,84 +731,3 @@ export const upsertDealTracker = asyncHandler(async (req, res) => {
     );
 });
 
-export async function upsertDealCommissionController(req, res, next) {
-  try {
-    const { error, value } = upsertCommissionSchema.validate(req.body, {
-      abortEarly: false,
-      convert: true,
-      stripUnknown: true,
-    });
-    if (error) {
-      return res.status(400).json({
-        statusCode: 400,
-        message: "Validation failed",
-        details: error.details.map((d) => d.message),
-      });
-    }
-
-    // assuming req.user.agentId from your auth middleware
-    const agentId = req.user?.agentId || null;
-
-    const data = await upsertDealCommissionService({
-      dealId: req.params.dealId,
-      agentId,
-      payload: value,
-    });
-
-    res.json({ statusCode: 200, data });
-  } catch (err) {
-    next(err);
-  }
-}
-
-export async function commissionSummaryController(req, res, next) {
-  try {
-    const scope = (req.query.scope || "month").toLowerCase(); // week|month|quarter|year|all
-    const includeVAT = req.query.vat === "1";                  // "1" to include VAT
-    const agentId = req.query.agentId || req.user?.agentId;   // default: self
-
-    const matchBase = {};
-    if (agentId && mongoose.isValidObjectId(agentId)) {
-      matchBase.assignedAgent = new mongoose.Types.ObjectId(agentId);
-    }
-    const timeFilter = buildTimeFilter(scope);
-
-    const expectedStage = "Offer Accepted";
-    const earnedStage   = "Exchange";
-
-    const [expected] = await Deal.aggregate([
-      { $match: { ...matchBase, stage: expectedStage, stageUpdatedAt: timeFilter } },
-      { $group: { _id: null, net: { $sum: "$commission.net" }, vat: { $sum: "$commission.vat" } } },
-    ]);
-
-    const [earned] = await Deal.aggregate([
-      { $match: { ...matchBase, stage: earnedStage, stageUpdatedAt: timeFilter } },
-      { $group: { _id: null, net: { $sum: "$commission.net" }, vat: { $sum: "$commission.vat" } } },
-    ]);
-
-    const expectedNet = expected?.net || 0;
-    const expectedVAT = expected?.vat || 0;
-    const earnedNet   = earned?.net   || 0;
-    const earnedVAT   = earned?.vat   || 0;
-
-    const totals = {
-      expected: includeVAT ? expectedNet + expectedVAT : expectedNet,
-      earned:   includeVAT ? earnedNet + earnedVAT     : earnedNet,
-    };
-
-    return res.status(200).json({
-      statusCode: 200,
-      data: {
-        scope,
-        includeVAT,
-        totals,
-        breakdown: {
-          expected: { net: expectedNet, vat: expectedVAT },
-          earned:   { net: earnedNet,   vat: earnedVAT },
-        },
-      },
-    });
-  } catch (err) {
-    next(err);
-  }
-}
