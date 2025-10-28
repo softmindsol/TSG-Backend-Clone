@@ -18,6 +18,7 @@ export const uploadOnCloudinary = async (localFilePath) => {
 
     const response = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "auto",
+      access_mode: "public",
     });
 
     // ✅ Delete file after successful upload
