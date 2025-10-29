@@ -14,7 +14,7 @@ import reportRoutes from "./routes/report.routes.js";
 import documentRoutes from "./routes/document.routes.js";
 import adminRoutes from "./routes/adminRoutes/admin.routes.js";
 import aiRoutes from "./routes/ai.routes.js"
-
+import subscriptionRoutes from "./routes/subscription.routes.js"
 import rateLimit from "express-rate-limit";
 dotenv.config();
 const app = express();
@@ -26,6 +26,8 @@ const corsOptions = {
   credentials: true,
 };
 app.use(cors(corsOptions));
+
+app.use("/api/subscription/webhook", express.raw({ type: "application/json" }));
 
 // Middleware
 app.use(express.json());
@@ -43,6 +45,7 @@ const aiLimiter = rateLimit({
 // Routes
 app.get("/", (req, res) => res.send("Welcome to TSG Backend"));
 app.use("/api/agents", agentRoutes);
+app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/clients", clientRoutes);
 app.use("/api/deal", dealRoutes);
 app.use("/api/event", eventRoutes);
