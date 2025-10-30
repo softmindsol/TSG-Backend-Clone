@@ -130,7 +130,7 @@ export const loginAgent = asyncHandler(async (req, res) => {
   }
 
   // 🔑 JWT generation
-  if (!process.env.JWT_SECRET) throw new ApiError(500, "JWT secret not configured");
+  if (!process.env.JWT_SECRET) throw new ApiError(500, "JWT secret noto configured");
   const expiresIn = process.env.JWT_EXPIRES_IN || "7d";
 
   const token = jwt.sign({ id: agent._id.toString(), role: "agent" }, process.env.JWT_SECRET, { expiresIn });
