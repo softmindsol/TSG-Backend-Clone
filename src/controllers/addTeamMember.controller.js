@@ -125,8 +125,10 @@ export const deleteTeamMember = async (req, res) => {
 export const getTeamMemberDetails = async (req, res) => {
   try {
     const { memberId } = req.params;
+    console.log("🚀 ~ getTeamMemberDetails ~ memberId:", memberId)
 
     const member = await Agent.findById(memberId).select("-password");
+    console.log("🚀 ~ getTeamMemberDetails ~ member:", member)
     if (!member || !member.isTeamMember) {
       return res.status(404).json({ error: "Team member not found" });
     }
