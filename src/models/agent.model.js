@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+const { Schema } = mongoose;
+
 const agentSchema = new mongoose.Schema(
   {
     firstName: { type: String, required: true },
@@ -28,6 +30,10 @@ const agentSchema = new mongoose.Schema(
     // Trial info
     demoStartDate: { type: Date, default: null },
     demoEndDate: { type: Date, default: null },
+    // Example schema update
+    teamSize: { type: Number, default: 0 }, // Sub-agent count (0 for individual plan)
+    isTeamMember: { type: Boolean, default: false }, // true if this user is a sub-agent
+    captainId: { type: Schema.Types.ObjectId, ref: "Agent", default: null }, // captain (main agent)
 
     // Subscription info
     subscriptionStatus: {

@@ -43,81 +43,107 @@ export const approveAgent = asyncHandler(async (req, res) => {
   }
 
   // Generate random password
-  const randomPassword = Math.random().toString(36).slice(-8); // e.g. "a9dj3ksl"
+  const randomPassword = Math.random().toString(36).slice(-8);
   const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
-  // Update agent
+  // Update agent fields
   agent.status = "approved";
   agent.password = hashedPassword;
-  agent.demoStartDate = new Date();
-  agent.demoEndDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+
+  // If agent is NOT a team member, start a 10-day demo
+  if (!agent.isTeamMember) {
+    agent.demoStartDate = new Date();
+    agent.demoEndDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+  } else {
+    // ✅ Inherit captain's subscription and deactivate demo
+    const captain = await Agent.findById(agent.captainId);
+    if (captain) {
+      agent.subscriptionStatus = captain.subscriptionStatus;
+      agent.subscriptionType = captain.subscriptionType;
+      agent.stripeCustomerId = captain.stripeCustomerId;
+      agent.stripeSubscriptionId = captain.stripeSubscriptionId;
+      agent.stripePriceId = captain.stripePriceId;
+    }
+  }
 
   await agent.save();
 
-  // Send email
+  // Send approval email
   await sendAgentApprovalEmail(agent.email, agent.firstName, randomPassword);
 
   return res
     .status(200)
-    .json(new ApiResponse(200, agent, "Agent approved successfully. Email sent."));
+    .json(
+      new ApiResponse(200, agent, "Agent approved successfully. Email sent.")
+    );
 });
+
 
 // login agent endpoint
 
 export const loginAgent = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // basic validation
-  if (!email || !password) {
-    throw new ApiError(400, "Email and password are required");
-  }
+  if (!email || !password) throw new ApiError(400, "Email and password are required");
 
   const agent = await Agent.findOne({ email }).select("+password");
   if (!agent) throw new ApiError(404, "Agent not found");
 
-  // must be approved by admin
   if (agent.status !== "approved") {
     throw new ApiError(403, "Your account is not approved yet");
   }
 
-  // verify password
   const isMatch = await bcrypt.compare(password, agent.password);
-  if (!isMatch) {
-    throw new ApiError(401, "Invalid credentials");
+  if (!isMatch) throw new ApiError(401, "Invalid credentials");
+
+  // 🧩 Team Member Logic
+  if (agent.isTeamMember && agent.captainId) {
+    const captain = await Agent.findById(agent.captainId);
+
+    if (!captain) throw new ApiError(403, "Captain account not found");
+
+    // Block if captain's subscription is inactive
+    if (captain.subscriptionStatus !== "active") {
+      throw new ApiError(403, "Your captain’s subscription is inactive. Access denied.");
+    }
+
+    // ✅ Inherit subscription details
+    agent.subscriptionStatus = captain.subscriptionStatus;
+    agent.subscriptionType = captain.subscriptionType;
+    agent.stripeCustomerId = captain.stripeCustomerId;
+    agent.stripeSubscriptionId = captain.stripeSubscriptionId;
+    agent.stripePriceId = captain.stripePriceId;
   }
 
-  // check demo period or subscription
-  // const now = new Date();
-  // const demoEnd = agent.demoEndDate ? new Date(agent.demoEndDate) : null;
-  // const demoActive = demoEnd && now <= demoEnd;
+  // 🔒 Normal subscription validation for non-team members
+  else {
+    const now = new Date();
+    const demoEnd = agent.demoEndDate ? new Date(agent.demoEndDate) : null;
+    const demoActive = demoEnd && now <= demoEnd;
 
-  // if (!demoActive && agent.subscriptionStatus !== "active") {
-  //   const expiryMsg = demoEnd ? `Your demo expired on ${demoEnd.toISOString()}.` : "Your demo is not active.";
-  //   throw new ApiError(403, `${expiryMsg} Please subscribe to continue.`);
-  // }
-
-  // ensure JWT secret exists
-  if (!process.env.JWT_SECRET) {
-    throw new ApiError(500, "JWT secret not configured");
+    if (!demoActive && agent.subscriptionStatus !== "active") {
+      const expiryMsg = demoEnd
+        ? `Your demo expired on ${demoEnd.toISOString()}.`
+        : "Your demo is not active.";
+      throw new ApiError(403, `${expiryMsg} Please subscribe to continue.`);
+    }
   }
+
+  // 🔑 JWT generation
+  if (!process.env.JWT_SECRET) throw new ApiError(500, "JWT secret not configured");
   const expiresIn = process.env.JWT_EXPIRES_IN || "7d";
 
-  // sign token
-  const token = jwt.sign(
-    { id: agent._id.toString(), role: "agent" },
-    process.env.JWT_SECRET,
-    { expiresIn }
-  );
+  const token = jwt.sign({ id: agent._id.toString(), role: "agent" }, process.env.JWT_SECRET, { expiresIn });
 
-  // prepare safe agent payload (remove sensitive fields)
   const agentObj = agent.toObject();
-  if (agentObj.password) delete agentObj.password;
-  if (agentObj.__v !== undefined) delete agentObj.__v;
+  delete agentObj.password;
+  delete agentObj.__v;
 
   return res
     .status(200)
     .json(new ApiResponse(200, { token, expiresIn, agent: agentObj }, "Login successful"));
 });
+
 
 export const changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword, confirmNewPassword } = req.body;

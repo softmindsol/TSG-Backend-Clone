@@ -1,3 +1,6 @@
+import mongoose from "mongoose";
+
+
 const teamMemberSchema = new mongoose.Schema(
   {
     agentId: { type: mongoose.Schema.Types.ObjectId, ref: "Agent", required: true },
