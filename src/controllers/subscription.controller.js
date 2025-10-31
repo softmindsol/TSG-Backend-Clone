@@ -21,6 +21,7 @@ const handleCheckoutCompleted = async (session) => {
     }
 
     const subscriptionId = session.subscription;
+    console.log("🚀 ~ handleCheckoutCompleted ~ subscriptionId:", subscriptionId)
     const customerId = session.customer;
 
     // ✅ Fetch full subscription details
@@ -51,6 +52,7 @@ const handleCheckoutCompleted = async (session) => {
       demoEndDate: null,
       teamSize: 0, // No sub-agents initially
     };
+    console.log("🚀 ~ handleCheckoutCompleted ~ updateData:", updateData)
 
     // ✅ Auto-upgrade to agency if planType = "agency"
     if (planType === "agency") {
