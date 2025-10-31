@@ -1,13 +1,13 @@
 import nodemailer from "nodemailer";
 
-// Create transporter for one.com
+// Create transporter for one.com using env variables
 const transporter = nodemailer.createTransport({
-  host: "send.one.com", // SMTP server
-  port: 465, // SSL port
-  secure: true, // true for port 465
+  host: process.env.SMTP_HOST, // e.g. send.one.com
+  port: Number(process.env.SMTP_PORT), // e.g. 465
+  secure: Number(process.env.SMTP_PORT) === 465, // true for SSL (465), false for STARTTLS (587)
   auth: {
-    user: process.env.SMTP_USER, // support@saxonfinder.com
-    pass: process.env.SMTP_PASS, // hexrib-jyjmoc-8powpA
+    user: process.env.SMTP_USER, // e.g. support@saxonfinder.com
+    pass: process.env.SMTP_PASS, // your SMTP password
   },
   logger: true,
   debug: true,
@@ -30,6 +30,6 @@ export const sendAgentApprovalEmail = async (to, firstName, password) => {
   };
 
   const info = await transporter.sendMail(mailOptions);
-  console.log("Email sent successfully:", info.messageId);
+  console.log("✅ Email sent successfully:", info.messageId);
   return info;
 };
