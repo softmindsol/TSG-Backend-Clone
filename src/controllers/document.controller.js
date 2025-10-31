@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Document } from "../models/document.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
@@ -44,15 +45,25 @@ export const uploadDocument = asyncHandler(async (req, res) => {
 });
 
 export const getAllDocumentsAndReports = asyncHandler(async (req, res) => {
-  // Fetch all uploaded documents
-  const documents = await Document.find()
-    .populate("clientId", "clientName")
-    .populate("category", "categoryName");
+  const agentId = req.user._id;
 
-  // Fetch all reports
-  const reports = await Report.find()
+  // Get all clients assigned to this agent
+  const clientsAssignedToAgent = await mongoose.model("Client").find({ assignedAgent: agentId }).select("_id");
+  const clientIds = clientsAssignedToAgent.map(client => client._id);
+
+  // Fetch only documents related to the agent's clients
+  const documents = await Document.find({
+    clientId: { $in: clientIds }
+  })
     .populate("clientId", "clientName")
-    .populate("generatedBy", "firstName");
+    .populate("uploadedBy", "firstName lastName");
+
+  // Fetch only reports related to the agent's clients
+  const reports = await Report.find({
+    clientId: { $in: clientIds }
+  })
+    .populate("clientId", "clientName")
+    .populate("generatedBy", "firstName lastName");
 
   return res.status(200).json(
     new ApiResponse(200, { documents, reports }, "Documents and reports fetched successfully")
