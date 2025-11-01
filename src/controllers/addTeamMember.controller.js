@@ -1,5 +1,6 @@
 
 import Agent from "../models/agent.model.js";
+import { sendSubAgentInviteEmail } from "../utils/emailService.js";
 import { addSubAgentToStripe } from "./subscription.controller.js";
 
 
@@ -44,7 +45,8 @@ export const addTeamMember = async (req, res) => {
     await addSubAgentToStripe(captain.stripeSubscriptionId, captain.teamSize);
 
     // Step 6: Send email invite (optional)
-    // await sendSubAgentInviteEmail(newSubAgent.email, captain.name);
+     await sendSubAgentInviteEmail(newSubAgent.email, captain.firstName || captain.name, newSubAgent.name);
+
 
     // Step 7: Respond with success
     return res.status(200).json({

@@ -35,3 +35,34 @@ export const sendAgentApprovalEmail = async (to, firstName, password) => {
   console.log("✅ Email sent successfully:", info.messageId);
   return info;
 };
+
+export const sendSubAgentInviteEmail = async (to, captainName, subAgentName) => {
+  const mailOptions = {
+    from: `"Saxon Finder" <${process.env.FROM_EMAIL}>`,
+    to,
+    subject: "Invitation to Join Saxon Finder Team 🚀",
+    html: `
+      <h2>Hello ${subAgentName || "there"},</h2>
+      <p>You’ve been invited by <strong>${captainName}</strong> to join their team on <strong>Saxon Finder</strong>.</p>
+      <p>As part of the team, you'll have access to your personalized dashboard to manage clients and listings.</p>
+      <br/>
+      <p><a href="${process.env.FRONTEND_URL}/register?email=${encodeURIComponent(to)}" 
+            style="background-color:#4159D8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">
+        Accept Invitation
+      </a></p>
+      <br/>
+      <p>If you didn’t expect this invitation, you can ignore this email.</p>
+      <p>Best regards,<br/>Saxon Finder Support Team</p>
+    `,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("✅ Invitation email sent:", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("❌ Failed to send invitation email:", error);
+    throw new Error("Email sending failed");
+  }
+};
+
