@@ -24,26 +24,29 @@ dotenv.config();
 const app = express();
 
 // ✅ Fix for Vercel reverse proxy issue
-app.set("trust proxy", 1); // <--- Add this line
+app.set("trust proxy", 1);
 
-// CORS
+// ✅ 1. Stripe Webhook must be mounted BEFORE express.json()
+import { handleSubscriptionSuccess } from "./controllers/subscription.controller.js";
+app.post(
+  "/api/subscription/webhook",
+  express.raw({ type: "application/json" }),
+  handleSubscriptionSuccess
+);
+
+// ✅ 2. Standard Middlewares
 const corsOptions = {
   origin: [process.env.FRONTEND_URL, "http://localhost:5173"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   credentials: true,
 };
 app.use(cors(corsOptions));
-
-// Stripe webhook (must come before express.json())
-app.use("/api/subscription/webhook", express.raw({ type: "application/json" }));
-
-// Middleware
+app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(helmet());
 
-// Rate limiter (AI + Checkout)
+// ✅ 3. Rate limiter (AI + Checkout)
 const aiLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
   max: 60,
@@ -52,7 +55,7 @@ const aiLimiter = rateLimit({
   message: { statusCode: 429, message: "Too many requests" },
 });
 
-// Routes
+// ✅ 4. Routes
 app.get("/", (req, res) => res.send("Welcome to TSG Backend"));
 app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/agents", agentRoutes);
@@ -68,7 +71,7 @@ app.use("/api/ai", aiLimiter, aiRoutes);
 app.use("/api/member", addMemberRoutes);
 app.use("/api/checkout", aiLimiter, checkoutRoutes);
 
-// Global error handler
+// ✅ 5. Global error handler
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   res.status(statusCode).json({
@@ -79,7 +82,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Connect DB
+// ✅ 6. Connect DB
 connectDb().catch((err) => {
   console.error("❌ Database connection failed:", err);
 });
