@@ -4,6 +4,7 @@ import {
   approveAgent,
   loginAgent,
   changePassword,
+  getCurrentAgent,
 } from "../controllers/agent.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 
@@ -14,6 +15,10 @@ router.post("/register-agent", registerAgent);
 router.post("/login-agent", loginAgent);
 
 router.post("/change-password", verifyJWT, changePassword);
+
+// Get current logged in agent
+router.get("/current", verifyJWT, getCurrentAgent);
+
 // Admin Approves Agent
 
 

@@ -145,6 +145,15 @@ export const loginAgent = asyncHandler(async (req, res) => {
 });
 
 
+export const getCurrentAgent = asyncHandler(async (req, res) => {
+  const agent = await Agent.findById(req.user._id);
+  if (!agent) throw new ApiError(404, "Agent not found");
+
+  return res.status(200).json(
+    new ApiResponse(200, agent, "Current agent details fetched successfully")
+  );
+});
+
 export const changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword, confirmNewPassword } = req.body;
   console.log("asdsadasdsadsad")
