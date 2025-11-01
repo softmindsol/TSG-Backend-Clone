@@ -13,13 +13,18 @@ import templateRoutes from "./routes/template.routes.js";
 import reportRoutes from "./routes/report.routes.js";
 import documentRoutes from "./routes/document.routes.js";
 import adminRoutes from "./routes/adminRoutes/admin.routes.js";
-import aiRoutes from "./routes/ai.routes.js"
-import subscriptionRoutes from "./routes/subscription.routes.js"
+import aiRoutes from "./routes/ai.routes.js";
+import subscriptionRoutes from "./routes/subscription.routes.js";
 import rateLimit from "express-rate-limit";
-import addMemberRoutes from "./routes/addTeamMember.routes.js"
-import checkoutRoutes from "./routes/checkout.routes.js"
+import addMemberRoutes from "./routes/addTeamMember.routes.js";
+import checkoutRoutes from "./routes/checkout.routes.js";
+
 dotenv.config();
+
 const app = express();
+
+// ✅ Fix for Vercel reverse proxy issue
+app.set("trust proxy", 1); // <--- Add this line
 
 // CORS
 const corsOptions = {
@@ -29,18 +34,19 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
+// Stripe webhook (must come before express.json())
 app.use("/api/subscription/webhook", express.raw({ type: "application/json" }));
-
-
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(helmet());
+
+// Rate limiter (AI + Checkout)
 const aiLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,          // 5 minutes
-  max: 60,                          // 60 requests / window / IP (tune per user later)
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: { statusCode: 429, message: "Too many requests" },
@@ -60,10 +66,7 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/ai", aiLimiter, aiRoutes);
 app.use("/api/member", addMemberRoutes);
-
 app.use("/api/checkout", aiLimiter, checkoutRoutes);
-
-
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -76,7 +79,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Connect to DB once when cold-started
+// Connect DB
 connectDb().catch((err) => {
   console.error("❌ Database connection failed:", err);
 });

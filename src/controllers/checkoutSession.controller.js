@@ -10,6 +10,8 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export const createCheckoutSession = asyncHandler(async (req, res) => {
+console.log("Hello From checkout")
+
   const { agentId, planType, billingInterval } = req.body;
 
   if (!agentId || !planType || !billingInterval) {

@@ -1,6 +1,8 @@
 import nodemailer from "nodemailer";
-
+import dotenv from "dotenv";
 // Create transporter for one.com using env variables
+dotenv.config();
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST, // e.g. send.one.com
   port: Number(process.env.SMTP_PORT), // e.g. 465
