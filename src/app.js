@@ -39,6 +39,7 @@ const corsOptions = {
   origin: [
     process.env.FRONTEND_URL,
     process.env.FRONTEND_URL_2,
+    process.env.ADMIN_FRONTEND_URL,
     "http://localhost:5173",
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
