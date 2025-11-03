@@ -21,6 +21,11 @@ export const addExtraContact = asyncHandler(async (req, res) => {
   const client = await Client.findById(clientId);
   if (!client) throw new ApiError(404, "Client not found");
 
+  // Check if email already exists in extraContacts
+  if (email && client.extraContacts.some(contact => contact.email === email)) {
+    throw new ApiError(400, "An extra contact with this email already exists");
+  }
+
   const newContact = {
     contactType,
     name,
@@ -35,9 +40,9 @@ export const addExtraContact = asyncHandler(async (req, res) => {
   client.extraContacts.push(newContact);
   await client.save();
 
-  return res
-    .status(201)
-    .json(new ApiResponse(201, client.extraContacts, "Extra contact added successfully"));
+  return res.status(201).json(
+    new ApiResponse(201, client.extraContacts, "Extra contact added successfully")
+  );
 });
 
 

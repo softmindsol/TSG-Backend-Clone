@@ -50,6 +50,12 @@ const agentSchema = new mongoose.Schema(
     stripeSubscriptionId: { type: String, default: null },
     stripePriceId: { type: String, default: null },
     billingPeriodEnd: { type: Date, default: null }, // Stripe cycle end date
+    profilePicture: { type: String, default: null }, // URL of profile picture
+    userType: {
+      type: String,
+      enum: ["agent", "subAgent", "adminAgent"],
+      default: "agent",
+    },
   },
   { timestamps: true }
 );

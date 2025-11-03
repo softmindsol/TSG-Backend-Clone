@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import Agent from "../models/agent.model.js"
 import { sendAgentApprovalEmail } from "../utils/emailService.js";
 import bcrypt from "bcryptjs";
+import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 // =========================
 // Register Agent
 // =========================
@@ -30,6 +31,38 @@ export const registerAgent = asyncHandler(async (req, res) => {
   });
 
   return res.status(201).json(new ApiResponse(201, agent, "Registration submitted. Awaiting admin approval."));
+});
+
+export const updateAgentProfile = asyncHandler(async (req, res) => {
+  const { agentId, firstName, lastName } = req.body; // agentId now comes from body
+  if (!agentId) throw new ApiError(400, "Agent ID is required");
+
+  const agent = await Agent.findById(agentId);
+  if (!agent) throw new ApiError(404, "Agent not found");
+
+  // If a file is uploaded
+  if (req.file) {
+    // Optional: delete old profile picture from Cloudinary
+    if (agent.profilePicturePublicId) {
+      await deleteFromCloudinary(agent.profilePicturePublicId);
+    }
+
+    const uploadResponse = await uploadOnCloudinary(req.file.path);
+    if (uploadResponse) {
+      agent.profilePicture = uploadResponse.secure_url;
+      agent.profilePicturePublicId = uploadResponse.public_id; // store public_id for future deletion
+    }
+  }
+
+  // Update name fields
+  if (firstName) agent.firstName = firstName;
+  if (lastName) agent.lastName = lastName;
+
+  await agent.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, agent, "Profile updated successfully"));
 });
 
 export const approveAgent = asyncHandler(async (req, res) => {
