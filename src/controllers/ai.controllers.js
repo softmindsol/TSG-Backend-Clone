@@ -7,7 +7,6 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { getCachedClientContext } from "../utils/contextCache.js";
 import { toQAPairs } from "../utils/qa.js";
 
-
 const MAX_TURNS = 15; // keep cost predictable
 const MODEL = "gpt-4o-mini"; // good balance
 
@@ -22,7 +21,9 @@ export const startSession = asyncHandler(async (req, res) => {
     messages: [],
   });
 
-  return res.status(201).json(new ApiResponse(201, session, "Chat session started"));
+  return res
+    .status(201)
+    .json(new ApiResponse(201, session, "Chat session started"));
 });
 
 export const listSessions = asyncHandler(async (req, res) => {
@@ -34,9 +35,13 @@ export const listSessions = asyncHandler(async (req, res) => {
     .lean();
 
   // make a preview title if empty
-  const data = sessions.map(s => ({
+  const data = sessions.map((s) => ({
     ...s,
-    displayTitle: s.title || (s?.clientId?.clientName ? `${s.clientId.clientName} Details` : "New Query"),
+    displayTitle:
+      s.title ||
+      (s?.clientId?.clientName
+        ? `${s.clientId.clientName} Details`
+        : "New Query"),
   }));
   return res.status(200).json(new ApiResponse(200, data, "Sessions fetched"));
 });
@@ -49,13 +54,13 @@ export const getSession = asyncHandler(async (req, res) => {
   const session = await ChatSession.findOne({ _id: sessionId, agentId })
     .populate("clientId", "clientName")
     .lean();
-  console.log("🚀 ~ session:", session)
+  console.log("🚀 ~ session:", session);
 
   if (!session) throw new ApiError(404, "Session not found");
 
   if (format === "qa") {
     const qa = toQAPairs(session.messages || []);
-    console.log("🚀 ~ qa:", qa)
+    console.log("🚀 ~ qa:", qa);
 
     // Return a compact payload optimized for UI render
     const payload = {
@@ -80,16 +85,22 @@ export const deleteSession = asyncHandler(async (req, res) => {
   const agentId = req.user._id;
   const { sessionId } = req.params;
 
-  const deleted = await ChatSession.findOneAndDelete({ _id: sessionId, agentId });
+  const deleted = await ChatSession.findOneAndDelete({
+    _id: sessionId,
+    agentId,
+  });
   if (!deleted) throw new ApiError(404, "Session not found");
 
-  return res.status(200).json(new ApiResponse(200, { sessionId }, "Session deleted"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { sessionId }, "Session deleted"));
 });
 
 export const sendMessage = asyncHandler(async (req, res) => {
   const agentId = req.user._id;
   const { sessionId, message, clientId: clientIdOverride } = req.body || {};
-  if (!sessionId || !message) throw new ApiError(400, "sessionId and message are required");
+  if (!sessionId || !message)
+    throw new ApiError(400, "sessionId and message are required");
 
   // load session (ensure ownership)
   const session = await ChatSession.findOne({ _id: sessionId, agentId });
@@ -103,29 +114,42 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   // build context (structured RAG)
   const contextText = await getCachedClientContext(
-  agentId,
-  session.clientId,
-  () => getClientContext(agentId, session.clientId)
-);
-  console.log("🚀 ~ contextText:", contextText)
+    agentId,
+    session.clientId,
+    () => getClientContext(agentId, session.clientId)
+  );
+  console.log("🚀 ~ contextText:", contextText);
 
   // slice last N turns for cost control
   const history = session.messages.slice(-MAX_TURNS);
-  
 
   const systemPrompt = `
 You are the TSG AI Assistant for real estate agents.
-Rules:
-- If a client is linked, prioritize facts from the provided TSG CONTEXT.
-- If info is missing or ambiguous, ask ONE short clarifying question.
-- Be concise and action-oriented; avoid placeholders when you can compute values.
-- If the user asks for an email/message, return a clear subject and body.
 
-Output preferences:
-- Use bullet points for summaries.
-- Dates in dd/mm/yyyy, currency as £123,456.
+Your role:
+- Assist agents with client information, property details, and communication drafts.
+- When a client is linked, always prioritize facts from the provided TSG CONTEXT.
+- If any detail is missing or unclear, ask ONE short clarifying question.
+
+Response style:
+- Use clear, natural, and professional language.
+- Be concise but conversational — sound like a helpful colleague, not a data sheet.
+- Avoid bullet points unless the user explicitly asks for a list or summary.
+- When presenting facts, combine them naturally into a readable sentence.
+- Format dates as dd/mm/yyyy and currency as £123,456.
+
+Examples:
+User: "What is the client’s purchase method and preferred location?"
+Assistant: "The client's purchase method is Cash, and their preferred location is City Centre / Urban."
+
+User: "Summarize the client's key preferences."
+Assistant: 
+- Purchase Method: Cash  
+- Preferred Location: City Centre / Urban  
+- Budget: £450,000
+
+Always keep your responses polite, factual, and action-oriented.
 `.trim();
-
 
   // OpenAI call
   const completion = await openai.chat.completions.create({
@@ -133,18 +157,28 @@ Output preferences:
     messages: [
       { role: "system", content: systemPrompt },
       ...(contextText ? [{ role: "system", content: contextText }] : []),
-      ...history.map(m => ({ role: m.role, content: m.content })),
+      ...history.map((m) => ({ role: m.role, content: m.content })),
     ],
     // max_tokens: Number(process.env.OPENAI_MAX_TOKENS || 800),
     // temperature: Number(process.env.OPENAI_TEMPERATURE || 0.2),
   });
-  console.log("🚀 ~ completion:", completion)
+  console.log("🚀 ~ completion:", completion);
 
-  const reply = completion.choices?.[0]?.message?.content?.trim() || "Sorry, I couldn't generate a response.";
+  const reply =
+    completion.choices?.[0]?.message?.content?.trim() ||
+    "Sorry, I couldn't generate a response.";
 
   // append assistant message & save
   session.messages.push({ role: "assistant", content: reply });
   await session.save();
 
-  return res.status(200).json(new ApiResponse(200, { reply, sessionId: session._id }, "Message answered"));
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { reply, sessionId: session._id },
+        "Message answered"
+      )
+    );
 });
