@@ -6,6 +6,7 @@ import {
   changePassword,
   getCurrentAgent,
   updateAgentProfile,
+  getMyTeam,
 } from "../controllers/agent.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
@@ -27,6 +28,8 @@ router.post("/change-password", verifyJWT, changePassword);
 
 // Get current logged in agent
 router.get("/current", verifyJWT, getCurrentAgent);
+
+router.get("/get-team", verifyJWT, getMyTeam);
 
 // Admin Approves Agent
 

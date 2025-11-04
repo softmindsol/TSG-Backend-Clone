@@ -6,6 +6,7 @@ import Agent from "../models/agent.model.js"
 import { sendAgentApprovalEmail } from "../utils/emailService.js";
 import bcrypt from "bcryptjs";
 import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
+import { getTeamAgents } from "../utils/teamAccess.helper.js";
 // =========================
 // Register Agent
 // =========================
@@ -220,4 +221,13 @@ export const changePassword = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Password changed successfully"));
+});
+
+export const getMyTeam = asyncHandler(async (req, res) => {
+  const agentId = req.user._id;
+  const team = await getTeamAgents(agentId);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { teamSize: team.length, team }, "Team fetched successfully"));
 });

@@ -177,18 +177,38 @@ export const createClient = asyncHandler(async (req, res) => {
   }
 });
 
-
 export const getAllClients = asyncHandler(async (req, res) => {
-  // ✅ Parse and validate query params
-  let { page = 1, limit = 10, search, clientType } = req.query;
+  let { page = 1, limit = 10, search, clientType, assignedTo } = req.query;
 
   page = Math.max(1, parseInt(page) || 1);
-  limit = Math.min(Math.max(1, parseInt(limit) || 10), 100); // Min 1, Max 100
-
+  limit = Math.min(Math.max(1, parseInt(limit) || 10), 100);
   const skip = (page - 1) * limit;
 
-  // ✅ Build query with optional filters
-  const query = { assignedAgent: req.user._id };
+  // ✅ Identify the team captain (either yourself or your captain)
+  const teamCaptainId = req.user.isTeamMember
+    ? req.user.captainId
+    : req.user._id;
+
+  // ✅ Get all team members (including captain)
+  const teamAgents = await Agent.find({
+    $or: [{ _id: teamCaptainId }, { captainId: teamCaptainId }],
+  }).select("_id");
+
+  const teamAgentIds = teamAgents.map((a) => a._id);
+
+  // ✅ Base query includes all clients assigned to anyone in this team
+  const query = { assignedAgent: { $in: teamAgentIds } };
+
+  // ✅ Filter by specific agent if assignedTo is provided and belongs to team
+  if (assignedTo) {
+    const isInTeam = teamAgentIds.some(
+      (id) => id.toString() === assignedTo.toString()
+    );
+    if (!isInTeam) {
+      throw new ApiError(403, "You are not authorized to view this agent's clients");
+    }
+    query.assignedAgent = assignedTo;
+  }
 
   if (search) {
     query.$or = [
@@ -202,32 +222,25 @@ export const getAllClients = asyncHandler(async (req, res) => {
     query.clientType = clientType;
   }
 
-  // ✅ Fetch clients with populated agent details
+  // ✅ Fetch clients with pagination
   const [clients, totalClients] = await Promise.all([
     Client.find(query)
-      .select(" -metadata") // Exclude heavy fields for list view
-      .populate("assignedAgent", "firstName email")
+      .select("-metadata")
+      .populate("assignedAgent", "firstName lastName email")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })
-      .lean(), // Use lean() for better performance
+      .lean(),
     Client.countDocuments(query),
   ]);
 
-  // For each client, calculate the average deal percentage
+  // ✅ Calculate average deal percentage per client
   for (let client of clients) {
-    // Fetch all deals for the client
     const deals = await Deal.find({ client: client._id }).lean();
-
-    // Calculate the average deal percentage
     const totalPercentage = deals.reduce((acc, deal) => {
       return acc + (deal.dealTracker ? getDealPercentage(deal.dealTracker.stage) : 0);
     }, 0);
-    
-    const averageDealPercentage = deals.length > 0 ? totalPercentage / deals.length : 0;
-    
-    // Add the average percentage to the client object
-    client.averageDealPercentage = averageDealPercentage;
+    client.averageDealPercentage = deals.length > 0 ? totalPercentage / deals.length : 0;
   }
 
   return res.status(200).json(
@@ -247,6 +260,78 @@ export const getAllClients = asyncHandler(async (req, res) => {
     )
   );
 });
+
+
+
+// export const getAllClients = asyncHandler(async (req, res) => {
+//   // ✅ Parse and validate query params
+//   let { page = 1, limit = 10, search, clientType } = req.query;
+
+//   page = Math.max(1, parseInt(page) || 1);
+//   limit = Math.min(Math.max(1, parseInt(limit) || 10), 100); // Min 1, Max 100
+
+//   const skip = (page - 1) * limit;
+
+//   // ✅ Build query with optional filters
+//   const query = { assignedAgent: req.user._id };
+
+//   if (search) {
+//     query.$or = [
+//       { clientName: { $regex: search, $options: "i" } },
+//       { clientEmail: { $regex: search, $options: "i" } },
+//       { clientCode: { $regex: search, $options: "i" } },
+//     ];
+//   }
+
+//   if (clientType && ["individual", "business"].includes(clientType)) {
+//     query.clientType = clientType;
+//   }
+
+//   // ✅ Fetch clients with populated agent details
+//   const [clients, totalClients] = await Promise.all([
+//     Client.find(query)
+//       .select(" -metadata") // Exclude heavy fields for list view
+//       .populate("assignedAgent", "firstName email")
+//       .skip(skip)
+//       .limit(limit)
+//       .sort({ createdAt: -1 })
+//       .lean(), // Use lean() for better performance
+//     Client.countDocuments(query),
+//   ]);
+
+//   // For each client, calculate the average deal percentage
+//   for (let client of clients) {
+//     // Fetch all deals for the client
+//     const deals = await Deal.find({ client: client._id }).lean();
+
+//     // Calculate the average deal percentage
+//     const totalPercentage = deals.reduce((acc, deal) => {
+//       return acc + (deal.dealTracker ? getDealPercentage(deal.dealTracker.stage) : 0);
+//     }, 0);
+    
+//     const averageDealPercentage = deals.length > 0 ? totalPercentage / deals.length : 0;
+    
+//     // Add the average percentage to the client object
+//     client.averageDealPercentage = averageDealPercentage;
+//   }
+
+//   return res.status(200).json(
+//     new ApiResponse(
+//       200,
+//       {
+//         clients,
+//         pagination: {
+//           total: totalClients,
+//           page,
+//           pages: Math.ceil(totalClients / limit),
+//           limit,
+//           hasMore: page * limit < totalClients,
+//         },
+//       },
+//       "Clients fetched successfully"
+//     )
+//   );
+// });
 
 export const getAllClientsSimple = asyncHandler(async (req, res) => {
   // ✅ Only fetch clients assigned to the logged-in user

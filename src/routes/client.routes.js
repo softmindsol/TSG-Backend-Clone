@@ -23,30 +23,33 @@ import {
   getAllExtraContacts,
 } from "../controllers/extracontact.controller.js";
 import { clientCommissionSummary } from "../controllers/commission.summary.controller.js";
+import { verifyClientAccess } from "../middleware/teamAccess.middleware.js";
 
 const router = express.Router();
 
 router.post(
   "/create-client",
   verifyJWT,
+  verifyClientAccess,
   upload.array("documents"),
   createClient
 );
-router.get("/get-all-clients", verifyJWT, getAllClients);
+router.get("/get-all-clients", verifyJWT, verifyClientAccess, getAllClients);
 
-router.get("/get-simple-clients", verifyJWT, getAllClientsSimple);
+router.get("/get-simple-clients", verifyJWT,verifyClientAccess,  getAllClientsSimple);
 
 
 router.patch(
   "/update-client/:clientId",
   verifyJWT,
   upload.array("documents", 5),
+  verifyClientAccess,
   updateClient
 );
 
-router.delete("/delete/:clientId", verifyJWT, deleteClient);
+router.delete("/delete/:clientId", verifyJWT, verifyClientAccess, deleteClient);
 
-router.get("/get-client-ById/:clientId", verifyJWT, getClientById);
+router.get("/get-client-ById/:clientId", verifyJWT, verifyClientAccess, getClientById);
 
 router.post(
   "/upload-document/:clientId",
