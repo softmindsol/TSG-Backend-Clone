@@ -30,11 +30,11 @@ const router = express.Router();
 router.post(
   "/create-client",
   verifyJWT,
-  verifyClientAccess,
+
   upload.array("documents"),
   createClient
 );
-router.get("/get-all-clients", verifyJWT, verifyClientAccess, getAllClients);
+router.get("/get-all-clients", verifyJWT,  getAllClients);
 
 router.get("/get-simple-clients", verifyJWT,verifyClientAccess,  getAllClientsSimple);
 

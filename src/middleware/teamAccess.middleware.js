@@ -7,6 +7,7 @@ export const verifyClientAccess = async (req, res, next) => {
     const { clientId } = req.params;
 
     const client = await Client.findById(clientId);
+    console.log("🚀 ~ verifyClientAccess ~ client:", client)
     if (!client)
       return res.status(404).json({ error: "Client not found" });
 

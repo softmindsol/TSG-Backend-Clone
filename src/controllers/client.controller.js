@@ -199,6 +199,7 @@ export const createClient = asyncHandler(async (req, res) => {
 
 
 export const getAllClients = asyncHandler(async (req, res) => {
+  console.log("first")
   let { page = 1, limit = 10, search, clientType, assignedTo } = req.query;
 
   page = Math.max(1, parseInt(page) || 1);
@@ -209,11 +210,13 @@ export const getAllClients = asyncHandler(async (req, res) => {
   const teamCaptainId = req.user.isTeamMember
     ? req.user.captainId
     : req.user._id;
+  console.log("🚀 ~ teamCaptainId:", teamCaptainId)
 
   // ✅ Get all team members (including captain)
   const teamAgents = await Agent.find({
     $or: [{ _id: teamCaptainId }, { captainId: teamCaptainId }],
   }).select("_id");
+  console.log("🚀 ~ teamAgents:", teamAgents)
 
   const teamAgentIds = teamAgents.map((a) => a._id);
 
