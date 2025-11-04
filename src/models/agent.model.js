@@ -21,6 +21,11 @@ const agentSchema = new mongoose.Schema(
 
     // Auth
     password: { type: String, default: null },
+    role: {
+      type: String,
+      enum: ["agent", "admin"],
+      default: "agent",
+    },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],
