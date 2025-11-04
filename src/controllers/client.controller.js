@@ -96,22 +96,42 @@ export const createClient = asyncHandler(async (req, res) => {
       purchaseMethod,
       preferredLocation,
       quickNotes,
+      assignedAgent, // 🧠 optional param for assigning to a team member
     } = req.body;
 
     if (!clientName || !clientEmail) {
       throw new ApiError(400, "Client name and email are required");
     }
 
+    // ✅ Determine team scope (get teamCaptainId)
+    const teamCaptainId = req.user.isTeamMember ? req.user.captainId : req.user._id;
+
+    // ✅ Fetch all team agents including captain
+    const teamAgents = await Agent.find({
+      $or: [{ _id: teamCaptainId }, { captainId: teamCaptainId }],
+    }).select("_id");
+
+    const teamAgentIds = teamAgents.map((a) => a._id.toString());
+
+    // ✅ Determine final assigned agent
+    const finalAssignedAgent = assignedAgent || req.user._id;
+
+    // ✅ Verify that the assigned agent is in the team
+    if (!teamAgentIds.includes(finalAssignedAgent.toString())) {
+      throw new ApiError(403, "You can only assign clients to your team members");
+    }
+
+    // ✅ Prevent duplicate client for the same assigned agent
     const existingClient = await Client.findOne({
       clientEmail: clientEmail.toLowerCase().trim(),
-      assignedAgent: req.user._id,
+      assignedAgent: finalAssignedAgent,
     });
 
     if (existingClient) {
-      throw new ApiError(409, "Client with this email already exists");
+      throw new ApiError(409, "Client with this email already exists for this agent");
     }
 
-    // Upload documents to Cloudinary if provided
+    // ✅ Upload documents if any
     let uploadedDocs = [];
     if (req.files && req.files.length > 0) {
       for (let file of req.files) {
@@ -126,7 +146,6 @@ export const createClient = asyncHandler(async (req, res) => {
       }
     }
 
-    // 🧠 Handle mustHaves and avoids (support both array or comma-separated string)
     const parsedMustHaves = Array.isArray(mustHaves)
       ? mustHaves
       : mustHaves
@@ -139,6 +158,7 @@ export const createClient = asyncHandler(async (req, res) => {
       ? avoids.split(",").map((item) => item.trim())
       : [];
 
+    // ✅ Create new client with verified assigned agent
     const newClient = await Client.create({
       clientCode: generateClientCode(),
       clientName,
@@ -166,7 +186,7 @@ export const createClient = asyncHandler(async (req, res) => {
         quickNotes: quickNotes || null,
       },
       documents: uploadedDocs,
-      assignedAgent: req.user._id,
+      assignedAgent: finalAssignedAgent, // ✅ verified team agent
     });
 
     return res
@@ -176,6 +196,7 @@ export const createClient = asyncHandler(async (req, res) => {
     throw new ApiError(500, error.message || "Error creating client");
   }
 });
+
 
 export const getAllClients = asyncHandler(async (req, res) => {
   let { page = 1, limit = 10, search, clientType, assignedTo } = req.query;
