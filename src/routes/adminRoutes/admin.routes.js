@@ -1,21 +1,21 @@
 import express from "express";
 
-import { verifyJWT } from "../../middleware/auth.middleware.js";
-import { deleteAgentById, getAgentPaymentInfo, getAllAgentRequests, getApprovedAgents, rejectAgent } from "../../controllers/adminControllers/admin.controller.js";
+import { verifyJWT, verifyAdminJWT } from "../../middleware/auth.middleware.js";
+import { deleteAgentById, getAgentPaymentInfo, getAgents, loginAdmin, rejectAgent } from "../../controllers/adminControllers/admin.controller.js";
 import { approveAgent } from "../../controllers/agent.controller.js";
 
 const router = express.Router();
 
-router.get("/agent-requests", getAllAgentRequests);
+router.post("/login", loginAdmin);
 
-router.get("/get-all-agents", getApprovedAgents);
+router.get("/agents", verifyAdminJWT, getAgents);
 
-router.delete("/delete-agent/:id", deleteAgentById);
+router.delete("/delete-agent/:id", verifyAdminJWT, deleteAgentById);
 
-router.patch("/approve-agent/:id", approveAgent);
+router.patch("/approve-agent/:id", verifyAdminJWT, approveAgent);
 
-router.delete("/reject-agent/:id", rejectAgent);
+router.delete("/reject-agent/:id", verifyAdminJWT, rejectAgent);
 
-router.get("/agent/payment-info/:id", getAgentPaymentInfo);
+router.get("/agent/payment-info/:id", verifyAdminJWT, getAgentPaymentInfo);
 
 export default router;

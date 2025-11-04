@@ -3,7 +3,29 @@ import Agent from "../../models/agent.model.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import ApiError from "../../utils/ApiError.js";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// Admin login
+export const loginAdmin = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) throw new ApiError(400, "Email and password are required");
+
+  const admin = await Agent.findOne({ email, role: "admin" }).select("+password");
+  if (!admin) throw new ApiError(404, "Admin not found");
+
+  const isMatch = await bcrypt.compare(password, admin.password);
+  if (!isMatch) throw new ApiError(401, "Invalid credentials");
+
+  const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { token, admin: { id: admin._id, email: admin.email, name: `${admin.firstName} ${admin.lastName}` } }, "Login successful"));
+});
 
 // Controller to get all registration requests for admin approval
 export const getAllAgentRequests = asyncHandler(async (req, res) => {
@@ -45,6 +67,42 @@ export const getApprovedAgents = asyncHandler(async (req, res) => {
         200,
         approvedAgents,
         "Approved agents fetched successfully."
+      )
+    );
+});
+
+// Get agents with status filter
+export const getAgents = asyncHandler(async (req, res) => {
+  const { status } = req.query;
+
+  // Build query based on status filter
+  const query = {};
+  if (status) {
+    if (status === 'all') {
+      // No filter for 'all'
+    } else {
+      query.status = status;
+    }
+  } else {
+    // Default to pending if no status specified
+    query.status = 'pending';
+  }
+
+  const agents = await Agent.find(query);
+
+  if (!agents || agents.length === 0) {
+    return res
+      .status(404)
+      .json(new ApiResponse(404, null, `No agents found${status ? ` with status '${status}'` : ''}.`));
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        agents,
+        `Agents${status ? ` with status '${status}'` : ''} fetched successfully.`
       )
     );
 });
@@ -114,44 +172,53 @@ export const getAgentPaymentInfo = asyncHandler(async (req, res) => {
     limit: 20, // show latest 20 invoices
   });
 
-  // 3️⃣ Calculate total paid
+  // 3️⃣ Get monthly rate
+  const price = await stripe.prices.retrieve(subscription.items.data[0].price.id);
+  const monthlyRate = price.unit_amount / 100; // in dollars
+
+  // 4️⃣ Calculate total paid
   const totalPaid =
     invoices.data
       .filter((inv) => inv.status === "paid")
       .reduce((sum, inv) => sum + inv.amount_paid, 0) / 100; // convert from cents
 
-  // 4️⃣ Determine subscription details
+  // 5️⃣ Determine subscription details
   const subscriptionStart = new Date(subscription.start_date * 1000);
   const nextPaymentDate = new Date(subscription.current_period_end * 1000);
   const monthsActive = Math.ceil(
     (Date.now() - subscriptionStart.getTime()) / (30 * 24 * 60 * 60 * 1000)
   );
 
-  // 5️⃣ Map payment history
-  const paymentHistory = invoices.data.map((inv) => ({
-    id: inv.id,
-    amount: inv.amount_paid / 100,
-    currency: inv.currency,
-    status: inv.status,
-    date: new Date(inv.created * 1000),
-    period_start: inv.lines.data[0]?.period?.start
-      ? new Date(inv.lines.data[0].period.start * 1000)
-      : null,
-    period_end: inv.lines.data[0]?.period?.end
-      ? new Date(inv.lines.data[0].period.end * 1000)
-      : null,
-  }));
+  // 6️⃣ Map payment history with method
+  const paymentHistory = await Promise.all(
+    invoices.data.map(async (inv) => {
+      let method = "N/A";
+      if (inv.payment_intent) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(inv.payment_intent);
+          if (paymentIntent.charges.data.length > 0) {
+            method = paymentIntent.charges.data[0].payment_method_details?.type || "card";
+          }
+        } catch (error) {
+          console.log("Error fetching payment method:", error.message);
+        }
+      }
+      return {
+        date: new Date(inv.created * 1000),
+        amount: inv.amount_paid / 100,
+        method,
+        status: inv.status,
+        invoiceId: inv.id,
+      };
+    })
+  );
 
-  // 6️⃣ Response data
+  // 7️⃣ Response data
   const data = {
-    cardInfo: {
-      subscriptionStatus: agent.subscriptionStatus,
-      subscriptionType: agent.subscriptionType,
-      totalPaid,
-      subscriptionStartDate: subscriptionStart,
-      nextPaymentDate,
-      monthsActive,
-    },
+    subscriptionStatus: subscription.status,
+    nextPaymentDate,
+    totalPaid,
+    monthlyRate,
     paymentHistory,
   };
 
