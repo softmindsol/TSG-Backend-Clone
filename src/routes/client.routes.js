@@ -73,36 +73,40 @@ router.delete(
   deleteClientDocument
 );
 
-router.post("/add-client-journal/:clientId", verifyJWT, addJournalEntry);
+router.post("/add-client-journal/:clientId", verifyJWT, verifyClientAccess,  addJournalEntry);
 
-router.get("/get-client-journal/:clientId", verifyJWT, getJournalEntries);
+router.get("/get-client-journal/:clientId", verifyJWT, verifyClientAccess,  getJournalEntries);
 
 router.post("/extra-contacts/:clientId", verifyJWT, addExtraContact);
 
 router.put(
   "/edit-extra-contacts/:clientId/:contactId",
   verifyJWT,
+  
   editExtraContact
 );
 
 router.delete(
   "/delete-extra-contacts/:clientId/:contactId",
   verifyJWT,
+  
   deleteExtraContact
 );
 
 // Get all extra contacts for a specific client
-router.get("/get-extra-contacts/:clientId", verifyJWT, getAllExtraContacts);
+router.get("/get-extra-contacts/:clientId", verifyJWT,  getAllExtraContacts);
 
 router.put(
   "/calculateCommissionSettings/:clientId",
   verifyJWT,
+  verifyClientAccess,
   upsertClientCommissionSettings
 );
 
 router.get(
   "/client-commission-summary/:clientId",
   verifyJWT,
+  verifyClientAccess,
   clientCommissionSummary
 );
 

@@ -58,7 +58,7 @@ export const upsertClientCommissionSettings = async (req, res, next) => {
     const { clientId } = req.params;
     const client = await Client.findOne({
       _id: clientId,
-      assignedAgent: req.user._id, // tenancy guard
+      // assignedAgent: req.user._id, 
     });
     if (!client) throw new ApiError(404, "Client not found or not assigned to you");
 
@@ -635,7 +635,7 @@ export const addJournalEntry = asyncHandler(async (req, res) => {
 
     const client = await Client.findOne({
       _id: clientId,
-      assignedAgent: req.user._id,
+      // assignedAgent: req.user._id,
     });
 
     if (!client)
@@ -664,7 +664,7 @@ export const getJournalEntries = asyncHandler(async (req, res) => {
 
     const client = await Client.findOne({
       _id: clientId,
-      assignedAgent: req.user._id,
+      // assignedAgent: req.user._id,
     })
       .select("journal assignedAgent")
       .populate("assignedAgent", "firstName email"); // assuming 'name' field exists in User model
