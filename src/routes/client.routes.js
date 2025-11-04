@@ -34,10 +34,14 @@ router.post(
   upload.array("documents"),
   createClient
 );
-router.get("/get-all-clients", verifyJWT,  getAllClients);
+router.get("/get-all-clients", verifyJWT, getAllClients);
 
-router.get("/get-simple-clients", verifyJWT,verifyClientAccess,  getAllClientsSimple);
-
+router.get(
+  "/get-simple-clients",
+  verifyJWT,
+  verifyClientAccess,
+  getAllClientsSimple
+);
 
 router.patch(
   "/update-client/:clientId",
@@ -49,7 +53,12 @@ router.patch(
 
 router.delete("/delete/:clientId", verifyJWT, verifyClientAccess, deleteClient);
 
-router.get("/get-client-ById/:clientId", verifyJWT, verifyClientAccess, getClientById);
+router.get(
+  "/get-client-ById/:clientId",
+  verifyJWT,
+  verifyClientAccess,
+  getClientById
+);
 
 router.post(
   "/upload-document/:clientId",
@@ -85,9 +94,17 @@ router.delete(
 // Get all extra contacts for a specific client
 router.get("/get-extra-contacts/:clientId", verifyJWT, getAllExtraContacts);
 
-router.put("/calculateCommissionSettings/:clientId", verifyJWT, upsertClientCommissionSettings)
+router.put(
+  "/calculateCommissionSettings/:clientId",
+  verifyJWT,
+  upsertClientCommissionSettings
+);
 
-router.get("/client-commission-summary/:clientId", verifyJWT, clientCommissionSummary);
+router.get(
+  "/client-commission-summary/:clientId",
+  verifyJWT,
+  clientCommissionSummary
+);
 
 // router.delete(
 //   "/delete-client/:clientId/journal/:journalId",

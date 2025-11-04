@@ -8,6 +8,9 @@ import { v2 as cloudinary } from "cloudinary";
 import Deal from "../models/deal.model.js";
 import Joi from "joi";
 import { recomputeAllDealsForClient } from "../utils/deal.service.js";
+import Agent from "../models/agent.model.js"
+
+
 // Function to generate unique client code
 const generateClientCode = () => {
   const randomStr = Math.random().toString(36).substring(2, 8); // 6 char random string
@@ -74,128 +77,144 @@ export const upsertClientCommissionSettings = async (req, res, next) => {
 };
 
 export const createClient = asyncHandler(async (req, res) => {
-  try {
-    const {
-      clientName,
-      clientEmail,
-      phoneNumber,
-      clientType,
-      address,
-      amlStatus,
-      currentPosition,
-      budgetMin,
-      budgetMax,
-      propertyType,
-      bedrooms,
-      bathrooms,
-      reasonForMove,
-      timeFrame,
-      designStyle,
-      mustHaves,
-      avoids,
-      purchaseMethod,
-      preferredLocation,
-      quickNotes,
-      assignedAgent, // 🧠 optional param for assigning to a team member
-    } = req.body;
+  const {
+    clientName,
+    clientEmail,
+    phoneNumber,
+    clientType,
+    address,
+    amlStatus,
+    currentPosition,
+    budgetMin,
+    budgetMax,
+    propertyType,
+    bedrooms,
+    bathrooms,
+    reasonForMove,
+    timeFrame,
+    designStyle,
+    mustHaves,
+    avoids,
+    purchaseMethod,
+    preferredLocation,
+    quickNotes,
+    assignedAgent,
+  } = req.body;
 
-    if (!clientName || !clientEmail) {
-      throw new ApiError(400, "Client name and email are required");
-    }
-
-    // ✅ Determine team scope (get teamCaptainId)
-    const teamCaptainId = req.user.isTeamMember ? req.user.captainId : req.user._id;
-
-    // ✅ Fetch all team agents including captain
-    const teamAgents = await Agent.find({
-      $or: [{ _id: teamCaptainId }, { captainId: teamCaptainId }],
-    }).select("_id");
-
-    const teamAgentIds = teamAgents.map((a) => a._id.toString());
-
-    // ✅ Determine final assigned agent
-    const finalAssignedAgent = assignedAgent || req.user._id;
-
-    // ✅ Verify that the assigned agent is in the team
-    if (!teamAgentIds.includes(finalAssignedAgent.toString())) {
-      throw new ApiError(403, "You can only assign clients to your team members");
-    }
-
-    // ✅ Prevent duplicate client for the same assigned agent
-    const existingClient = await Client.findOne({
-      clientEmail: clientEmail.toLowerCase().trim(),
-      assignedAgent: finalAssignedAgent,
-    });
-
-    if (existingClient) {
-      throw new ApiError(409, "Client with this email already exists for this agent");
-    }
-
-    // ✅ Upload documents if any
-    let uploadedDocs = [];
-    if (req.files && req.files.length > 0) {
-      for (let file of req.files) {
-        const uploadedDoc = await uploadOnCloudinary(file.path);
-        uploadedDocs.push({
-          url: uploadedDoc.secure_url,
-          public_id: uploadedDoc.public_id,
-          filename: file.originalname,
-          size: file.size,
-          format: file.mimetype,
-        });
-      }
-    }
-
-    const parsedMustHaves = Array.isArray(mustHaves)
-      ? mustHaves
-      : mustHaves
-      ? mustHaves.split(",").map((item) => item.trim())
-      : [];
-
-    const parsedAvoids = Array.isArray(avoids)
-      ? avoids
-      : avoids
-      ? avoids.split(",").map((item) => item.trim())
-      : [];
-
-    // ✅ Create new client with verified assigned agent
-    const newClient = await Client.create({
-      clientCode: generateClientCode(),
-      clientName,
-      clientEmail,
-      phoneNumber,
-      clientType,
-      address,
-      amlStatus,
-      currentPosition,
-      buyingPreference: {
-        budget: {
-          min: budgetMin || null,
-          max: budgetMax || null,
-        },
-        propertyType: propertyType || null,
-        bedrooms: bedrooms || null,
-        bathrooms: bathrooms || null,
-        reasonForMove: reasonForMove || null,
-        timeframe: timeFrame || null,
-        designStyle: designStyle || null,
-        mustHaves: parsedMustHaves,
-        avoids: parsedAvoids,
-        purchaseMethod: purchaseMethod || null,
-        preferredLocation: preferredLocation || null,
-        quickNotes: quickNotes || null,
-      },
-      documents: uploadedDocs,
-      assignedAgent: finalAssignedAgent, // ✅ verified team agent
-    });
-
-    return res
-      .status(201)
-      .json(new ApiResponse(201, newClient, "Client created successfully"));
-  } catch (error) {
-    throw new ApiError(500, error.message || "Error creating client");
+  if (!clientName || !clientEmail) {
+    throw new ApiError(400, "Client name and email are required");
   }
+
+  // ✅ Determine team scope
+  const teamCaptainId = req.user.isTeamMember ? req.user.captainId : req.user._id;
+
+  // ✅ Get full team including captain and all members
+  const teamAgents = await Agent.find({
+    $or: [{ _id: teamCaptainId }, { captainId: teamCaptainId }],
+  }).select("_id");
+  console.log("🚀 ~ teamAgents:", teamAgents)
+
+  const teamAgentIds = teamAgents.map((a) => a._id.toString());
+  // ✅ Determine final assigned agent
+let finalAssignedAgent = assignedAgent || req.user._id;
+
+// 🧹 Normalize if assignedAgent is an array or contains label text
+if (Array.isArray(finalAssignedAgent)) {
+  // e.g. ["Abdullah", "69090db749f054ce37b221e4"]
+  finalAssignedAgent = finalAssignedAgent[finalAssignedAgent.length - 1];
+}
+
+if (typeof finalAssignedAgent === "string" && finalAssignedAgent.includes(",")) {
+  // e.g. "Abdullah,69090db749f054ce37b221e4"
+  finalAssignedAgent = finalAssignedAgent.split(",").pop().trim();
+}
+
+console.log("✅ Clean finalAssignedAgent:", finalAssignedAgent);
+
+
+  // ✅ Verify assignment
+  if (!teamAgentIds.includes(finalAssignedAgent.toString())) {
+    return res
+      .status(403)
+      .json(
+        new ApiResponse(
+          403,
+          {},
+          "You can only assign clients to your team members"
+        )
+      );
+  }
+
+  // ✅ Prevent duplicate client
+  const existingClient = await Client.findOne({
+    clientEmail: clientEmail.toLowerCase().trim(),
+    assignedAgent: finalAssignedAgent,
+  });
+
+  if (existingClient) {
+    throw new ApiError(409, "Client with this email already exists for this agent");
+  }
+
+  // ✅ Upload documents if any
+  let uploadedDocs = [];
+  if (req.files?.length) {
+    for (let file of req.files) {
+      const uploadedDoc = await uploadOnCloudinary(file.path);
+      uploadedDocs.push({
+        url: uploadedDoc.secure_url,
+        public_id: uploadedDoc.public_id,
+        filename: file.originalname,
+        size: file.size,
+        format: file.mimetype,
+      });
+    }
+  }
+
+  const parsedMustHaves = Array.isArray(mustHaves)
+    ? mustHaves
+    : mustHaves
+    ? mustHaves.split(",").map((i) => i.trim())
+    : [];
+
+  const parsedAvoids = Array.isArray(avoids)
+    ? avoids
+    : avoids
+    ? avoids.split(",").map((i) => i.trim())
+    : [];
+
+  // ✅ Create new client
+  const newClient = await Client.create({
+    clientCode: generateClientCode(),
+    clientName,
+    clientEmail,
+    phoneNumber,
+    clientType,
+    address,
+    amlStatus,
+    currentPosition,
+    buyingPreference: {
+      budget: { min: budgetMin || null, max: budgetMax || null },
+      propertyType: propertyType || null,
+      bedrooms: bedrooms || null,
+      bathrooms: bathrooms || null,
+      reasonForMove: reasonForMove || null,
+      timeframe: timeFrame || null,
+      designStyle: designStyle || null,
+      mustHaves: parsedMustHaves,
+      avoids: parsedAvoids,
+      purchaseMethod: purchaseMethod || null,
+      preferredLocation: preferredLocation || null,
+      quickNotes: quickNotes || null,
+    },
+    documents: uploadedDocs,
+    assignedAgent: finalAssignedAgent,
+  });
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, newClient, "Client created successfully"));
 });
+
 
 
 export const getAllClients = asyncHandler(async (req, res) => {
