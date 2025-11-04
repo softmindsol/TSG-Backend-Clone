@@ -14,7 +14,7 @@ export const getTeamAgents = async (agentId) => {
   // Captain + all members
   const team = await Agent.find({
     $or: [{ _id: captainId }, { captainId }],
-  }).select("_id firstName lastName email agentType isTeamMember captainId");
+  }).select("_id firstName lastName email agentType isTeamMember captainId phoneNumber companyName operatingArea");
 
   return team;
 };
