@@ -63,6 +63,8 @@ router.get(
 router.post(
   "/upload-document/:clientId",
   verifyJWT,
+  verifyClientAccess,
+
   upload.single("document"),
   uploadClientDocument
 );
@@ -70,6 +72,8 @@ router.post(
 router.delete(
   "/delete-document/:clientId/:publicId",
   verifyJWT,
+  verifyClientAccess,
+
   deleteClientDocument
 );
 

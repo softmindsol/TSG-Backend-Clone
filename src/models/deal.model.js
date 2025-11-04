@@ -274,7 +274,7 @@ const DealSchema = new Schema(
     propertyAddress: { type: String, default: null },
     dealType: {
       type: String,
-      enum: ["Buyer Rep", "Seller Rep", "Development", "Investment"],
+      enum: ["Commercial", "Residential"],
       required: true, // Ensure dealType is always provided
     },
     stage: {

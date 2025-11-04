@@ -553,7 +553,7 @@ export const uploadClientDocument = asyncHandler(async (req, res) => {
 
     let client = await Client.findOne({
       _id: clientId,
-      assignedAgent: req.user._id,
+      // assignedAgent: req.user._id,
     });
 
     if (!client) {
@@ -594,7 +594,7 @@ export const deleteClientDocument = asyncHandler(async (req, res) => {
 
     let client = await Client.findOne({
       _id: clientId,
-      assignedAgent: req.user._id,
+      // assignedAgent: req.user._id,
     });
 
     if (!client) {
