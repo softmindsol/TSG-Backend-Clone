@@ -414,7 +414,7 @@ export const updateClient = asyncHandler(async (req, res) => {
     // 🔍 Find client belonging to this agent
     let client = await Client.findOne({
       _id: clientId,
-      assignedAgent: req.user._id,
+      // assignedAgent: req.user._id,
     });
 
     if (!client) {
@@ -493,7 +493,7 @@ export const deleteClient = asyncHandler(async (req, res) => {
     // 🔍 Find the client and ensure it's assigned to this agent
     const client = await Client.findOne({
       _id: clientId,
-      assignedAgent: req.user._id,
+      // assignedAgent: req.user._id,
     });
 
     if (!client) {
@@ -530,14 +530,12 @@ export const getClientById = asyncHandler(async (req, res) => {
     const { clientId } = req.params;
     console.log("🚀 ~ clientId:", clientId);
 
-    // 🔍 Find client only if assigned to this agent
-    const client = await Client.findOne({
-      _id: clientId,
-      assignedAgent: req.user._id,
-    }).populate("assignedAgent", "firstName email"); // optional: include agent info
+    // ✅ Access already verified in middleware
+    const client = await Client.findById(clientId)
+      .populate("assignedAgent", "firstName email");
 
     if (!client) {
-      throw new ApiError(404, "Client not found or not assigned to you");
+      throw new ApiError(404, "Client not found");
     }
 
     return res
@@ -547,6 +545,7 @@ export const getClientById = asyncHandler(async (req, res) => {
     throw new ApiError(500, error.message || "Error fetching client details");
   }
 });
+
 
 export const uploadClientDocument = asyncHandler(async (req, res) => {
   try {
